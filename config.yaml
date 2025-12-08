@@ -1,0 +1,8 @@
+port_name: /dev/tty.usbserial-A9ZM7WQL
+target_fps: 20
+frame_interval: 0.01 #s/frame
+target_w: 70
+target_h: 40
+position_num: 10
+position_base: 13
+log_level: DEBUG

@@ -11,3 +11,5 @@ PyYAML
 requests
 onnxruntime
 pyserial
+logging
+pyyaml
