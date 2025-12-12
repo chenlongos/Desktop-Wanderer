@@ -1,2 +1,2 @@
-from .process import process_img
+from .process import yolo_infer
 from .box import Box

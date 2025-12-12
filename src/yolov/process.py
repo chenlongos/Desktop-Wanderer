@@ -31,7 +31,7 @@ else:
 
 img_size = 640
 
-def process_img(frame):
+def yolo_infer(frame):
     if frame is None or frame.size == 0:
         print("无效的图像输入")
         return []
