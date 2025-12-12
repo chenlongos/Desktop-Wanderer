@@ -30,28 +30,44 @@ class KeyboardTeleop:
     def on_press(self, key):
         try:
             char = key.char.lower()
-            if char == 'w': self.keys["forward"] = True
-            elif char == 's': self.keys["backward"] = True
-            elif char == 'a': self.keys["left"] = True
-            elif char == 'd': self.keys["right"] = True
-            elif char == 'q': self.keys["rotate_left"] = True
-            elif char == 'e': self.keys["rotate_right"] = True
-            elif char == ']': self.keys["speed_up"] = True
-            elif char == '[': self.keys["speed_down"] = True
+            if char == 'w':
+                self.keys["forward"] = True
+            elif char == 's':
+                self.keys["backward"] = True
+            elif char == 'a':
+                self.keys["left"] = True
+            elif char == 'd':
+                self.keys["right"] = True
+            elif char == 'q':
+                self.keys["rotate_left"] = True
+            elif char == 'e':
+                self.keys["rotate_right"] = True
+            elif char == ']':
+                self.keys["speed_up"] = True
+            elif char == '[':
+                self.keys["speed_down"] = True
         except AttributeError:
             pass  # 忽略特殊键
 
     def on_release(self, key):
         try:
             char = key.char.lower()
-            if char == 'w': self.keys["forward"] = False
-            elif char == 's': self.keys["backward"] = False
-            elif char == 'a': self.keys["left"] = False
-            elif char == 'd': self.keys["right"] = False
-            elif char == 'q': self.keys["rotate_left"] = False
-            elif char == 'e': self.keys["rotate_right"] = False
-            elif char == ']': self.keys["speed_up"] = False
-            elif char == '[': self.keys["speed_down"] = False
+            if char == 'w':
+                self.keys["forward"] = False
+            elif char == 's':
+                self.keys["backward"] = False
+            elif char == 'a':
+                self.keys["left"] = False
+            elif char == 'd':
+                self.keys["right"] = False
+            elif char == 'q':
+                self.keys["rotate_left"] = False
+            elif char == 'e':
+                self.keys["rotate_right"] = False
+            elif char == ']':
+                self.keys["speed_up"] = False
+            elif char == '[':
+                self.keys["speed_down"] = False
             elif key == keyboard.Key.esc:
                 return False  # 停止监听
         except AttributeError:
@@ -74,12 +90,18 @@ class KeyboardTeleop:
         y_cmd = 0.0
         theta_cmd = 0.0
 
-        if self.keys["forward"]:    x_cmd += xy_speed
-        if self.keys["backward"]:   x_cmd -= xy_speed
-        if self.keys["left"]:       y_cmd += xy_speed
-        if self.keys["right"]:      y_cmd -= xy_speed
-        if self.keys["rotate_left"]:  theta_cmd += theta_speed
-        if self.keys["rotate_right"]: theta_cmd -= theta_speed
+        if self.keys["forward"]:
+            x_cmd += xy_speed
+        if self.keys["backward"]:
+            x_cmd -= xy_speed
+        if self.keys["left"]:
+            y_cmd += xy_speed
+        if self.keys["right"]:
+            y_cmd -= xy_speed
+        if self.keys["rotate_left"]:
+            theta_cmd += theta_speed
+        if self.keys["rotate_right"]:
+            theta_cmd -= theta_speed
 
         # 注意：如果下游期望 theta.vel 是 rad/s，需转换：
         # theta_cmd = np.deg2rad(theta_cmd)

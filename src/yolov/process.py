@@ -1,16 +1,15 @@
 import os
 import cv2
 import numpy as np
-import yaml
 
 from .box import Box
+from src.state import get_hardware_mode
 
-with open('config.yaml', 'r', encoding='utf-8') as f:
-    config = yaml.safe_load(f)
-HARDWARE_MODE = config['hardware_mode']
+HARDWARE_MODE = get_hardware_mode()
 
 if HARDWARE_MODE == "310b":
     import acl
+
     from acllite.acllite_model import AclLiteModel
     from acllite.acllite_resource import AclLiteResource
 

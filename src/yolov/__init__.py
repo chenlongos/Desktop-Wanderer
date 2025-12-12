@@ -1,2 +1,6 @@
-from .process import yolo_infer
-from .box import Box
+from .process import yolo_infer as yolo_infer
+from .box import Box as Box
+
+__all__ = [
+    "Box",
+]

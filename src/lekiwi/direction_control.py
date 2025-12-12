@@ -19,12 +19,18 @@ class DirectionControl:
         y_cmd = 0.0
         theta_cmd = 0.0
 
-        if target == "forward":    x_cmd += xy_speed
-        if target == "backward":   x_cmd -= xy_speed
-        if target == "left":       y_cmd += xy_speed
-        if target == "right":      y_cmd -= xy_speed
-        if target == "rotate_left":  theta_cmd += theta_speed
-        if target == "rotate_right": theta_cmd -= theta_speed
+        if target == "forward":
+            x_cmd += xy_speed
+        if target == "backward":
+            x_cmd -= xy_speed
+        if target == "left":
+            y_cmd += xy_speed
+        if target == "right":
+            y_cmd -= xy_speed
+        if target == "rotate_left":
+            theta_cmd += theta_speed
+        if target == "rotate_right":
+            theta_cmd -= theta_speed
 
         # 注意：如果下游期望 theta.vel 是 rad/s，需转换：
         # theta_cmd = np.deg2rad(theta_cmd)
