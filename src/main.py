@@ -1,9 +1,12 @@
 import sys
 import os
 
-from src.state import init_app, get_left, get_top, get_right, get_bottom, get_port, get_log_level
+from src.arm_act_controller import arm_controller
+from src.arm_keyboard_controller import p_control_loop, move_to_zero_position
+from src.state import init_app, get_left, get_top, get_right, get_bottom, get_port, get_log_level, get_robot_status, \
+    RobotStatus, get_control_mode, RobotControlModel
 from src.utils import busy_wait
-from .move_controller import move_controller
+from src.move_controller import move_controller, get_empty_move_action
 
 sys.path.append(os.path.dirname(__file__))
 import time
@@ -13,7 +16,6 @@ import cv2
 from src.lekiwi import LeKiwiConfig
 from src.lekiwi.lekiwi import LeKiwi
 
-from src.lekiwi.key_board_teleop import KeyboardTeleop
 from src.lekiwi.direction_control import DirectionControl
 from yolov.process import yolo_infer
 
@@ -27,17 +29,41 @@ def main():
     init_app()
     cfg = LeKiwiConfig(port=get_port())
     robot = LeKiwi(cfg)
+    direction = DirectionControl()
     robot.connect()
 
-    teleop = KeyboardTeleop()
-    direction = DirectionControl()
-    cap = cv2.VideoCapture(0)
+    print("Reading initial joint angles...")
+    start_obs = robot.get_observation()
+    start_positions = {}
+    for key, value in start_obs.items():
+        if key.endswith('.pos'):
+            motor_name = key.removesuffix('.pos')
+            start_positions[motor_name] = int(value)  # Don't apply calibration coefficients
+
+    print("Initial joint angles:")
+    for joint_name, position in start_positions.items():
+        print(f"  {joint_name}: {position}°")
+
+    move_to_zero_position(robot, duration=5.0)
+
+    x0, y0 = 0.1629, 0.1131
+    current_x, current_y = x0, y0
+
+    target_positions = {
+        'arm_shoulder_pan': 0.0,
+        'arm_shoulder_lift': 0.0,
+        'arm_elbow_flex': 0.0,
+        'arm_wrist_flex': 0.0,
+        'arm_wrist_roll': 0.0,
+        'arm_gripper': 0.0
+    }
 
     try:
         while True:
             t0 = time.perf_counter()
 
-            ret, frame = cap.read()
+            obs = robot.get_observation()
+            frame = obs["front"]
             result = yolo_infer(frame)
 
             if True:
@@ -56,12 +82,22 @@ def main():
                 if key == ord('q'):
                     break
 
-            move_action = move_controller(direction, result)
+            arm_action = {}
+            move_action = get_empty_move_action(direction)
 
-            _action_sent = robot.send_action(move_action)
+            if get_robot_status() == RobotStatus.CATCH:
+                if get_control_mode() == RobotControlModel.ACT:
+                    arm_action = arm_controller(robot)
+                else:
+                    arm_action = p_control_loop(robot, target_positions, start_positions, current_x,
+                                                current_y, kp=0.5,
+                                                control_freq=50)
+            if get_robot_status() == RobotStatus.SEARCH:
+                move_action = move_controller(direction, result)
+
+            _action_sent = robot.send_action({**arm_action, **move_action})
             busy_wait(max(1.0 / FPS - (time.perf_counter() - t0), 0.0))
     finally:
-        teleop.stop()
         robot.disconnect()
 
 

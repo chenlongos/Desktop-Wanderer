@@ -1,5 +1,5 @@
 from src.lekiwi import DirectionControl
-from .state import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h
+from .state import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus
 from .utils import get_nearly_target_box
 from src.yolov import Box
 
@@ -42,8 +42,12 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             action = direction.get_action(None)
         else:
             action = direction.get_action(None)
+            set_robot_status(RobotStatus.CATCH)
     else:
         # action = teleop.get_action()
         # action = direction.get_action("rotate_right", 0)
         action = direction.get_action(None)
     return action
+
+def get_empty_move_action(direction: DirectionControl):
+    return direction.get_action(None)

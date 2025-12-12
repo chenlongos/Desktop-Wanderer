@@ -1,4 +1,4 @@
-port: /dev/tty.usbmodem5A7C1231451
+port: /dev/tty.usbmodem5A7C1220171
 target_fps: 20
 frame_interval: 0.01 #s/frame
 target_w: 450
@@ -7,3 +7,4 @@ position_num: 10
 position_base: 13
 log_level: DEBUG
 hardware_mode: normal
+control_mode: inverse
