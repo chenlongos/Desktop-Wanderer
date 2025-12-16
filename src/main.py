@@ -24,8 +24,9 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 
 FPS = 50
 
-CATCH_ACTION = [("wrist_flex", 48), ("open_gripper", 50), ("move_to", (0.1089, -0.06)), ("close_gripper", 40),
-                ("move_to", (0.0, 0.13)), ("open_gripper", 50)]
+CATCH_ACTION = [("shoulder_pan", -8),("wrist_flex", 48), ("open_gripper", 60), ("move_to", (0.1089, -0.07)), ("close_gripper", 40),
+                ("shoulder_pan", 8), ("move_to", (0.0, 0.13)), ("open_gripper", 50)]
+# CATCH_ACTION = [("shoulder_pan", -8),("wrist_flex", 48), ("open_gripper", 50), ("move_to", (0.1089, -0.06))]
 
 
 def main():
@@ -92,19 +93,28 @@ def main():
                                 current_y - CATCH_ACTION[command_step][1][1]) < 0.005:
                             command_step += 1
                             if command_step == len(CATCH_ACTION):
-                                set_robot_status(RobotStatus.FIND)
+                                set_robot_status(RobotStatus.SEARCH)
+                                command_step = 0
                     elif CATCH_ACTION[command_step][0] == "open_gripper":
                         command_step += 1
                         if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.FIND)
+                            set_robot_status(RobotStatus.SEARCH)
+                            command_step = 0
                     elif CATCH_ACTION[command_step][0] == "close_gripper":
                         command_step += 1
                         if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.FIND)
+                            set_robot_status(RobotStatus.SEARCH)
+                            command_step = 0
                     elif CATCH_ACTION[command_step][0] == "wrist_flex":
                         command_step += 1
                         if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.FIND)
+                            set_robot_status(RobotStatus.SEARCH)
+                            command_step = 0
+                    elif CATCH_ACTION[command_step][0] == "shoulder_pan":
+                        command_step += 1
+                        if command_step == len(CATCH_ACTION):
+                            set_robot_status(RobotStatus.SEARCH)
+                            command_step = 0
             elif get_robot_status() == RobotStatus.SEARCH:
                 move_action = move_controller(direction, result)
 

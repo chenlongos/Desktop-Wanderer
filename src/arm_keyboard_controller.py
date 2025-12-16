@@ -98,7 +98,14 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5, control_freq=50):
                 key = 'f'
             for _ in range(abs(step)):
                 wrist_command_list.append(key)
-
+        elif cmd_name == 'shoulder_pan':
+            step = cmd[1]
+            if step > 0:
+                key = 'a'
+            else:
+                key = 'q'
+            for _ in range(abs(step)):
+                joint_command_list.append(key)
 
         # Pitch control
         if len(wrist_command_list) > 0:
@@ -327,6 +334,7 @@ def inverse_kinematics(x, y, l1=0.1159, l2=0.1350):
 
 
 def move_to_zero_position(robot, duration=3.0, kp=0.5):
+    global target_positions
     """
     Use P control to slowly move robot to zero position
 
