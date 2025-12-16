@@ -21,7 +21,6 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         box = get_nearly_target_box(result, TARGET_CX, TARGET_CY)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
-        center_y = y + h // 2
         position = max(w, h)
         if center_x < left:
             if abs(TARGET_CX - center_x) < target_w:
@@ -33,13 +32,13 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
                 action = direction.get_action("rotate_right", 0)
             else:
                 action = direction.get_action("rotate_right")
-        elif position < TARGET_POSITION:
-            if TARGET_POSITION - position < target_h * 2 // 3:
+        elif position < (TARGET_POSITION - 20) * 2:
+            if TARGET_POSITION - position < target_h:
                 action = direction.get_action("forward", 0)
             else:
                 action = direction.get_action("forward")
-        elif center_y > bottom:
-            action = direction.get_action(None)
+        elif position > (TARGET_POSITION + 20) * 2:
+            action = direction.get_action("backward", 0)
         else:
             action = direction.get_action(None)
             set_robot_status(RobotStatus.CATCH)
