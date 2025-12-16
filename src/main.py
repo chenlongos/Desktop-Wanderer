@@ -21,7 +21,7 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 
 FPS = 50
 
-CATCH_ACTION = [("shoulder_pan", -8), ("wrist_flex", 48), ("gripper", 60), ("move_to", (0.1089, -0.07)),
+CATCH_ACTION = [("shoulder_pan", -8), ("wrist_flex", 48), ("gripper", 60), ("move_to", (0.1089, -0.075)),
                 ("gripper", -40),
                 ("shoulder_pan", 8), ("move_to", (0.0, 0.13)), ("gripper", 50)]
 

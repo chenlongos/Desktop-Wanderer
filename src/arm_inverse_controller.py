@@ -22,10 +22,8 @@ joint_controls = {
 
 # x,y coordinate control
 xy_controls = {
-    'w': ('x', -0.004),  # x decrease
-    's': ('x', 0.004),  # x increase
-    'e': ('y', -0.004),  # y decrease
-    'd': ('y', 0.004),  # y increase
+    'x': 0.004,  # x increase
+    'y': 0.004,  # y increase
 }
 
 
@@ -41,7 +39,6 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5):
     """
 
     # Initialize pitch control variables
-    pitch_step = 1  # Pitch adjustment step size
     target_positions = get_target_positions()
     pitch = get_pitch()
 
@@ -56,17 +53,13 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5):
             cmd_y = cmd[1][1]
 
             if cmd_x > current_x:
-                key = 's'
-                move_command_list.append(key)
+                move_command_list.append(('x', 1))
             if cmd_x < current_x:
-                key = 'w'
-                move_command_list.append(key)
+                move_command_list.append(('x', -1))
             if cmd_y > current_y:
-                key = 'd'
-                move_command_list.append(key)
+                move_command_list.append(('y', 1))
             if cmd_y < current_y:
-                key = 'e'
-                move_command_list.append(key)
+                move_command_list.append(('y', -1))
 
         if cmd_name in joint_controls:
             joint_command_list.append(cmd)
@@ -90,12 +83,12 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5):
                     print(f"Update target position {joint_name}: {current_target} -> {new_target}")
 
         if len(move_command_list) > 0:
-            for key in move_command_list:
-                coord, delta = xy_controls[key]
-                if coord == 'x':
-                    current_x += delta
-                elif coord == 'y':
-                    current_y += delta
+            for key, value in move_command_list:
+                delta = xy_controls[key]
+                if key == 'x':
+                    current_x += delta * value
+                elif key == 'y':
+                    current_y += delta * value
 
             # Calculate target angles for joint2 and joint3
             joint2_target, joint3_target = inverse_kinematics(current_x, current_y)
