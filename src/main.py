@@ -24,6 +24,8 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 
 FPS = 30
 
+CATCH_ACTION = [("move_to", (10, 10))]
+COMMAND_STEP = 0
 
 def main():
     init_app()
@@ -44,19 +46,10 @@ def main():
     for joint_name, position in start_positions.items():
         print(f"  {joint_name}: {position}°")
 
-    move_to_zero_position(robot, duration=5.0)
+    move_to_zero_position(robot, duration=3.0)
 
     x0, y0 = 0.1629, 0.1131
     current_x, current_y = x0, y0
-
-    target_positions = {
-        'arm_shoulder_pan': 0.0,
-        'arm_shoulder_lift': 0.0,
-        'arm_elbow_flex': 0.0,
-        'arm_wrist_flex': 0.0,
-        'arm_wrist_roll': 0.0,
-        'arm_gripper': 0.0
-    }
 
     try:
         while True:
@@ -89,7 +82,7 @@ def main():
                 if get_control_mode() == RobotControlModel.ACT:
                     arm_action = arm_controller(robot)
                 else:
-                    arm_action = p_control_loop(robot, target_positions, start_positions, current_x,
+                    arm_action, current_x, current_y = p_control_loop(robot, 'w',start_positions, current_x,
                                                 current_y, kp=0.5,
                                                 control_freq=50)
             if get_robot_status() == RobotStatus.SEARCH:

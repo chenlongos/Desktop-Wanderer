@@ -6,6 +6,7 @@ import yaml
 class RobotStatus(Enum):
     SEARCH = "search"
     CATCH = "catch"
+    FIND = "find"
 
 
 class RobotControlModel(Enum):

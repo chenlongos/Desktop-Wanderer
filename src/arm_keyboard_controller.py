@@ -11,13 +11,24 @@ JOINT_CALIBRATION = [
     ['arm_gripper', 0.0, 1.0],  # Joint 6: zero position offset, scale factor
 ]
 
+target_positions = {
+    'arm_shoulder_pan': 0.0,
+    'arm_shoulder_lift': 0.0,
+    'arm_elbow_flex': 0.0,
+    'arm_wrist_flex': 0.0,
+    'arm_wrist_roll': 0.0,
+    'arm_gripper': 0.0
+}
 
-def p_control_loop(robot, target_positions, start_positions, current_x, current_y, kp=0.5, control_freq=50):
+
+def p_control_loop(robot, key, start_positions, current_x, current_y, kp=0.5, control_freq=50):
+    global target_positions
     """
     P control loop
 
     Args:
         robot: robot instance
+        key: key code
         target_positions: target joint position dictionary
         start_positions: start joint position dictionary
         current_x: current x coordinate
@@ -32,116 +43,111 @@ def p_control_loop(robot, target_positions, start_positions, current_x, current_
 
     print(f"Starting P control loop, control frequency: {control_freq}Hz, proportional gain: {kp}")
 
-    while True:
-        try:
-            for key in ['q', 'q', 'q']:
-                if key == 'x':
-                    # Exit program, first return to start position
-                    print("Exit command detected, returning to start position...")
-                    return_to_start_position(robot, start_positions, 0.2, control_freq)
-                    return None
+    try:
+        if key == 'x':
+            # Exit program, first return to start position
+            print("Exit command detected, returning to start position...")
+            return_to_start_position(robot, start_positions, 0.2, control_freq)
+            return None
 
-                # Joint control mapping
-                joint_controls = {
-                    'q': ('arm_shoulder_pan', -1),  # Joint 1 decrease
-                    'a': ('arm_shoulder_pan', 1),  # Joint 1 increase
-                    't': ('arm_wrist_roll', -1),  # Joint 5 decrease
-                    'g': ('arm_wrist_roll', 1),  # Joint 5 increase
-                    'y': ('arm_gripper', -1),  # Joint 6 decrease
-                    'h': ('arm_gripper', 1),  # Joint 6 increase
-                }
+            # Joint control mapping
+        joint_controls = {
+            'q': ('arm_shoulder_pan', -1),  # Joint 1 decrease
+            'a': ('arm_shoulder_pan', 1),  # Joint 1 increase
+            't': ('arm_wrist_roll', -1),  # Joint 5 decrease
+            'g': ('arm_wrist_roll', 1),  # Joint 5 increase
+            'y': ('arm_gripper', -1),  # Joint 6 decrease
+            'h': ('arm_gripper', 1),  # Joint 6 increase
+        }
 
-                # x,y coordinate control
-                xy_controls = {
-                    'w': ('x', -0.004),  # x decrease
-                    's': ('x', 0.004),  # x increase
-                    'e': ('y', -0.004),  # y decrease
-                    'd': ('y', 0.004),  # y increase
-                }
+        # x,y coordinate control
+        xy_controls = {
+            'w': ('x', -0.004),  # x decrease
+            's': ('x', 0.004),  # x increase
+            'e': ('y', -0.004),  # y decrease
+            'd': ('y', 0.004),  # y increase
+        }
 
-                # Pitch control
-                if key == 'r':
-                    pitch += pitch_step
-                    print(f"Increase pitch adjustment: {pitch:.3f}")
-                elif key == 'f':
-                    pitch -= pitch_step
-                    print(f"Decrease pitch adjustment: {pitch:.3f}")
+        # Pitch control
+        if key == 'r':
+            pitch += pitch_step
+            print(f"Increase pitch adjustment: {pitch:.3f}")
+        elif key == 'f':
+            pitch -= pitch_step
+            print(f"Decrease pitch adjustment: {pitch:.3f}")
 
-                if key in joint_controls:
-                    joint_name, delta = joint_controls[key]
-                    if joint_name in target_positions:
-                        current_target = target_positions[joint_name]
-                        new_target = int(current_target + delta)
-                        target_positions[joint_name] = new_target
-                        print(f"Update target position {joint_name}: {current_target} -> {new_target}")
+        if key in joint_controls:
+            joint_name, delta = joint_controls[key]
+            if joint_name in target_positions:
+                current_target = target_positions[joint_name]
+                new_target = int(current_target + delta)
+                target_positions[joint_name] = new_target
+                print(f"Update target position {joint_name}: {current_target} -> {new_target}")
 
-                elif key in xy_controls:
-                    coord, delta = xy_controls[key]
-                    if coord == 'x':
-                        current_x += delta
-                        # Calculate target angles for joint2 and joint3
-                        joint2_target, joint3_target = inverse_kinematics(current_x, current_y)
-                        target_positions['arm_shoulder_lift'] = joint2_target
-                        target_positions['arm_elbow_flex'] = joint3_target
-                        print(
-                            f"Update x coordinate: {current_x:.4f}, joint2={joint2_target:.3f}, joint3={joint3_target:.3f}")
-                    elif coord == 'y':
-                        current_y += delta
-                        # Calculate target angles for joint2 and joint3
-                        joint2_target, joint3_target = inverse_kinematics(current_x, current_y)
-                        target_positions['arm_shoulder_lift'] = joint2_target
-                        target_positions['arm_elbow_flex'] = joint3_target
-                        print(
-                            f"Update y coordinate: {current_y:.4f}, joint2={joint2_target:.3f}, joint3={joint3_target:.3f}")
+        elif key in xy_controls:
+            coord, delta = xy_controls[key]
+            if coord == 'x':
+                current_x += delta
+                # Calculate target angles for joint2 and joint3
+                joint2_target, joint3_target = inverse_kinematics(current_x, current_y)
+                target_positions['arm_shoulder_lift'] = joint2_target
+                target_positions['arm_elbow_flex'] = joint3_target
+                print(
+                    f"Update x coordinate: {current_x:.4f}, joint2={joint2_target:.3f}, joint3={joint3_target:.3f}")
+            elif coord == 'y':
+                current_y += delta
+                # Calculate target angles for joint2 and joint3
+                joint2_target, joint3_target = inverse_kinematics(current_x, current_y)
+                target_positions['arm_shoulder_lift'] = joint2_target
+                target_positions['arm_elbow_flex'] = joint3_target
+                print(
+                    f"Update y coordinate: {current_y:.4f}, joint2={joint2_target:.3f}, joint3={joint3_target:.3f}")
 
-            # Apply pitch adjustment to wrist_flex
-            # Calculate wrist_flex target position based on shoulder_lift and elbow_flex
-            if 'arm_shoulder_lift' in target_positions and 'arm_elbow_flex' in target_positions:
-                target_positions['arm_wrist_flex'] = - target_positions['arm_shoulder_lift'] - target_positions[
-                    'arm_elbow_flex'] + pitch
-                # Show current pitch value (display every 100 steps to avoid screen flooding)
-                if hasattr(p_control_loop, 'step_counter'):
-                    p_control_loop.step_counter += 1
-                else:
-                    p_control_loop.step_counter = 0
-                if p_control_loop.step_counter % 100 == 0:
-                    print(
-                        f"Current pitch adjustment: {pitch:.3f}, wrist_flex target: {target_positions['arm_wrist_flex']:.3f}")
+        # Apply pitch adjustment to wrist_flex
+        # Calculate wrist_flex target position based on shoulder_lift and elbow_flex
+        if 'arm_shoulder_lift' in target_positions and 'arm_elbow_flex' in target_positions:
+            target_positions['arm_wrist_flex'] = - target_positions['arm_shoulder_lift'] - target_positions[
+                'arm_elbow_flex'] + pitch
+            # Show current pitch value (display every 100 steps to avoid screen flooding)
+        if hasattr(p_control_loop, 'step_counter'):
+            p_control_loop.step_counter += 1
+        else:
+            p_control_loop.step_counter = 0
+        if p_control_loop.step_counter % 100 == 0:
+            print(
+                f"Current pitch adjustment: {pitch:.3f}, wrist_flex target: {target_positions['arm_wrist_flex']:.3f}")
 
-            # Get current robot state
-            current_obs = robot.get_observation()
+        # Get current robot state
+        current_obs = robot.get_observation()
 
-            # Extract current joint positions
-            current_positions = {}
-            for key, value in current_obs.items():
-                if key.endswith('.pos'):
-                    motor_name = key.removesuffix('.pos')
-                    # Apply calibration coefficients
-                    calibrated_value = apply_joint_calibration(motor_name, value)
-                    current_positions[motor_name] = calibrated_value
+        # Extract current joint positions
+        current_positions = {}
+        for key, value in current_obs.items():
+            if key.endswith('.pos'):
+                motor_name = key.removesuffix('.pos')
+                # Apply calibration coefficients
+                calibrated_value = apply_joint_calibration(motor_name, value)
+                current_positions[motor_name] = calibrated_value
 
-            # P control calculation
-            robot_action = {}
-            for joint_name, target_pos in target_positions.items():
-                if joint_name in current_positions:
-                    current_pos = current_positions[joint_name]
-                    error = target_pos - current_pos
+        # P control calculation
+        robot_action = {}
+        for joint_name, target_pos in target_positions.items():
+            if joint_name in current_positions:
+                current_pos = current_positions[joint_name]
+                error = target_pos - current_pos
 
-                    # P control: output = Kp * error
-                    control_output = kp * error
+                # P control: output = Kp * error
+                control_output = kp * error
 
-                    # Convert control output to position command
-                    new_position = current_pos + control_output
-                    robot_action[f"{joint_name}.pos"] = new_position
+                # Convert control output to position command
+                new_position = current_pos + control_output
+                robot_action[f"{joint_name}.pos"] = new_position
 
-            if robot_action:
-                return robot_action
-
-        except KeyboardInterrupt:
-            print("User interrupted program")
-        except Exception as e:
-            print(f"P control loop error: {e}")
-            traceback.print_exc()
+        if robot_action:
+            return robot_action, current_x, current_y
+    except Exception as e:
+        print(f"P control loop error: {e}")
+        traceback.print_exc()
 
 
 def return_to_start_position(robot, start_positions, kp=0.5, control_freq=50):
@@ -184,9 +190,14 @@ def return_to_start_position(robot, start_positions, kp=0.5, control_freq=50):
                 new_position = current_pos + control_output
                 robot_action[f"{joint_name}.pos"] = new_position
 
+        base_action = {
+            "x.vel": 0,
+            "y.vel": 0,
+            "theta.vel": 0,
+        }
         # Send action to robot
         if robot_action:
-            robot.send_action(robot_action)
+            robot.send_action({**robot_action, **base_action})
 
         # Check if reached start position
         if total_error < 2.0:  # If total error is less than 2 degrees, consider reached
