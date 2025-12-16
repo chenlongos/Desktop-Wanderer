@@ -3,6 +3,7 @@ import os
 
 from src.arm_act_controller import arm_controller
 from src.arm_inverse_controller import p_control_loop, move_to_zero_position
+from src.robot_set_up import init_robot, get_robot, get_direction, reset_robot
 from src.set_up import init_app, get_left, get_top, get_right, get_bottom, get_port, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status
 from src.utils import busy_wait
@@ -13,10 +14,6 @@ import time
 import logging
 import cv2
 
-from src.lekiwi import LeKiwiConfig
-from src.lekiwi.lekiwi import LeKiwi
-
-from src.lekiwi.direction_control import DirectionControl
 from yolov.process import yolo_infer
 
 logger = logging.getLogger(__name__)
@@ -24,16 +21,19 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 
 FPS = 50
 
-CATCH_ACTION = [("shoulder_pan", -8),("wrist_flex", 48), ("open_gripper", 60), ("move_to", (0.1089, -0.07)), ("close_gripper", 40),
+CATCH_ACTION = [("shoulder_pan", -8), ("wrist_flex", 48), ("open_gripper", 60), ("move_to", (0.1089, -0.07)),
+                ("close_gripper", 40),
                 ("shoulder_pan", 8), ("move_to", (0.0, 0.13)), ("open_gripper", 50)]
+
+
 # CATCH_ACTION = [("shoulder_pan", -8),("wrist_flex", 48), ("open_gripper", 50), ("move_to", (0.1089, -0.06))]
 
 
 def main():
     init_app()
-    cfg = LeKiwiConfig(port=get_port())
-    robot = LeKiwi(cfg)
-    direction = DirectionControl()
+    init_robot()
+    robot = get_robot()
+    direction = get_direction()
     robot.connect()
 
     print("Reading initial joint angles...")
@@ -94,26 +94,13 @@ def main():
                             command_step += 1
                             if command_step == len(CATCH_ACTION):
                                 set_robot_status(RobotStatus.SEARCH)
+                                reset_robot()
                                 command_step = 0
-                    elif CATCH_ACTION[command_step][0] == "open_gripper":
+                    else:
                         command_step += 1
                         if command_step == len(CATCH_ACTION):
                             set_robot_status(RobotStatus.SEARCH)
-                            command_step = 0
-                    elif CATCH_ACTION[command_step][0] == "close_gripper":
-                        command_step += 1
-                        if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.SEARCH)
-                            command_step = 0
-                    elif CATCH_ACTION[command_step][0] == "wrist_flex":
-                        command_step += 1
-                        if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.SEARCH)
-                            command_step = 0
-                    elif CATCH_ACTION[command_step][0] == "shoulder_pan":
-                        command_step += 1
-                        if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.SEARCH)
+                            reset_robot()
                             command_step = 0
             elif get_robot_status() == RobotStatus.SEARCH:
                 move_action = move_controller(direction, result)

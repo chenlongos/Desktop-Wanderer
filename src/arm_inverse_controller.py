@@ -2,6 +2,8 @@ import math
 import time
 import traceback
 
+from src.robot_set_up import get_target_positions, get_pitch, set_pitch
+
 JOINT_CALIBRATION = [
     ['arm_shoulder_pan', 6.0, 1.0],  # Joint 1: zero position offset, scale factor
     ['arm_shoulder_lift', 2.0, 0.97],  # Joint 2: zero position offset, scale factor
@@ -10,15 +12,6 @@ JOINT_CALIBRATION = [
     ['arm_wrist_roll', 0.0, 0.5],  # Joint 5: zero position offset, scale factor
     ['arm_gripper', 0.0, 1.0],  # Joint 6: zero position offset, scale factor
 ]
-
-target_positions = {
-    'arm_shoulder_pan': 0.0,
-    'arm_shoulder_lift': 0.0,
-    'arm_elbow_flex': 0.0,
-    'arm_wrist_flex': 0.0,
-    'arm_wrist_roll': 0.0,
-    'arm_gripper': 0.0
-}
 
 # Joint control mapping
 joint_controls = {
@@ -38,17 +31,12 @@ xy_controls = {
     'd': ('y', 0.004),  # y increase
 }
 
-pitch = 0.0  # Initial pitch adjustment
-
 def p_control_loop(robot, cmd, current_x, current_y, kp=0.5, control_freq=50):
-    global target_positions, pitch
     """
     P control loop
 
     Args:
         robot: robot instance
-        target_positions: target joint position dictionary
-        start_positions: start joint position dictionary
         current_x: current x coordinate
         current_y: current y coordinate
         kp: proportional gain
@@ -57,6 +45,8 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5, control_freq=50):
 
     # Initialize pitch control variables
     pitch_step = 1  # Pitch adjustment step size
+    target_positions = get_target_positions()
+    pitch = get_pitch()
 
     move_command_list = []
     joint_command_list = []
@@ -116,6 +106,7 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5, control_freq=50):
                 elif key == 'f':
                     pitch -= pitch_step
                     print(f"Decrease pitch adjustment: {pitch:.3f}")
+            set_pitch(pitch)
 
         if len(joint_command_list) > 0:
             for key in joint_command_list:
@@ -334,7 +325,6 @@ def inverse_kinematics(x, y, l1=0.1159, l2=0.1350):
 
 
 def move_to_zero_position(robot, duration=3.0, kp=0.5):
-    global target_positions
     """
     Use P control to slowly move robot to zero position
 
