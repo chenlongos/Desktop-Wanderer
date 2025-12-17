@@ -2,7 +2,7 @@ import math
 import time
 import traceback
 
-from src.robot_set_up import get_target_positions, get_pitch, set_pitch
+from src.robot_setup import get_target_positions, get_pitch, set_pitch
 
 JOINT_CALIBRATION = [
     ['arm_shoulder_pan', 6.0, 1.0],  # Joint 1: zero position offset, scale factor

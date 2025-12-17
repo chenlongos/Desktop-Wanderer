@@ -2,10 +2,10 @@ import sys
 import os
 
 from src.arm_act_controller import arm_controller
-from src.arm_inverse_controller import p_control_loop, move_to_zero_position, return_to_start_position
-from src.robot_set_up import init_robot, get_robot, get_direction, reset_robot, get_target_positions
-from src.set_up import init_app, get_left, get_top, get_right, get_bottom, get_port, get_log_level, get_robot_status, \
-    RobotStatus, get_control_mode, RobotControlModel, set_robot_status
+from src.arm_inverse_controller import p_control_loop, return_to_start_position
+from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
+from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
+    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_hardware_mode
 from src.utils import busy_wait
 from src.move_controller import move_controller, get_empty_move_action
 
@@ -62,7 +62,7 @@ def main():
             frame = obs["front"]
             result = yolo_infer(frame)
 
-            if True:
+            if get_hardware_mode() == 'normal':
                 for box in result:
                     x, y, w, h = box.x, box.y, box.w, box.h
                     center_x = x + w // 2

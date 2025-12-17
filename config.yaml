@@ -6,5 +6,5 @@ target_h: 450
 position_num: 10
 position_base: 13
 log_level: DEBUG
-hardware_mode: normal
-control_mode: inverse
+hardware_mode: normal # normal,310b
+control_mode: inverse # inverse, act

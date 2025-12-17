@@ -8,7 +8,7 @@ from lerobot.policies.factory import make_pre_post_processors
 from lerobot.policies.utils import build_inference_frame, make_robot_action
 
 from src.lekiwi.lekiwi import LeKiwi
-from src.set_up import get_control_mode, RobotControlModel
+from src.setup import get_control_mode, RobotControlModel
 
 if get_control_mode() == RobotControlModel.ACT:
     device = torch.device("mps")

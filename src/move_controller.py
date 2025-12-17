@@ -1,5 +1,5 @@
 from src.lekiwi import DirectionControl
-from .set_up import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus
+from .setup import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus
 from .utils import get_nearly_target_box
 from src.yolov import Box
 

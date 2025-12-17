@@ -1,6 +1,6 @@
 from src.lekiwi import LeKiwiConfig, DirectionControl
 from src.lekiwi.lekiwi import LeKiwi
-from src.set_up import get_port
+from src.setup import get_port
 
 _is_robot_initialized = False
 _robot = None
