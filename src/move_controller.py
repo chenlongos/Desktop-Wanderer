@@ -16,7 +16,10 @@ TARGET_CY = top + target_h // 2
 
 TARGET_POSITION = max(target_w, target_h)
 
+_cycle_time = 0
+
 def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
+    global _cycle_time
     if result and len(result) > 0:
         box = get_nearly_target_box(result, TARGET_CX, TARGET_CY)
         x, y, w, h = box.x, box.y, box.w, box.h
@@ -27,21 +30,28 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
                 action = direction.get_action("rotate_left", 0)
             else:
                 action = direction.get_action("rotate_left")
+            _cycle_time = 0
         elif center_x > right:
             if abs(TARGET_CX - center_x) < target_w:
                 action = direction.get_action("rotate_right", 0)
             else:
                 action = direction.get_action("rotate_right")
+            _cycle_time = 0
         elif position < (TARGET_POSITION - 20) * 2:
             if TARGET_POSITION - position < target_h:
                 action = direction.get_action("forward", 0)
             else:
                 action = direction.get_action("forward")
+            _cycle_time = 0
         elif position > (TARGET_POSITION + 20) * 2:
             action = direction.get_action("backward", 0)
+            _cycle_time = 0
         else:
             action = direction.get_action(None)
-            set_robot_status(RobotStatus.CATCH)
+            _cycle_time += 1
+            if _cycle_time > 10:
+                set_robot_status(RobotStatus.CATCH)
+                _cycle_time = 0
     else:
         # action = teleop.get_action()
         # action = direction.get_action("rotate_right", 0)

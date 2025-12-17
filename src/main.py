@@ -48,7 +48,6 @@ def main():
     for joint_name, position in start_positions.items():
         print(f"  {joint_name}: {position}°")
 
-    # move_to_zero_position(robot, duration=2.0)
     return_to_start_position(robot, get_target_positions(), 0.2, FPS)
     # x0, y0 = 0.1629, 0.1131
     x0, y0 = 0.0069, 0.0970

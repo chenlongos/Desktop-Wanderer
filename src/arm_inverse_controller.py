@@ -142,6 +142,7 @@ def p_control_loop(robot, cmd, current_x, current_y, kp=0.5):
     except Exception as e:
         print(f"P control loop error: {e}")
         traceback.print_exc()
+        return {}, current_x, current_y
 
 
 def return_to_start_position(robot, start_positions, kp=0.5, control_freq=50):
