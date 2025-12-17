@@ -1,5 +1,4 @@
 from src.lekiwi import LeKiwiConfig, DirectionControl
-from src.lekiwi.config import RobotConfig
 from src.lekiwi.lekiwi import LeKiwi
 from src.set_up import get_port
 
@@ -9,9 +8,9 @@ _direction = None
 
 _target_positions = {
     'arm_shoulder_pan': 0.0,
-    'arm_shoulder_lift': 0.0,
-    'arm_elbow_flex': 0.0,
-    'arm_wrist_flex': 0.0,
+    'arm_shoulder_lift': -87.92304,
+    'arm_elbow_flex': 61.31621,
+    'arm_wrist_flex': 26.60682,
     'arm_wrist_roll': 0.0,
     'arm_gripper': 0.0
 }
@@ -53,9 +52,9 @@ def reset_target_positions():
         init_robot()
     _target_positions = {
         'arm_shoulder_pan': 0.0,
-        'arm_shoulder_lift': 0.0,
-        'arm_elbow_flex': 0.0,
-        'arm_wrist_flex': 0.0,
+        'arm_shoulder_lift': -87.92304,
+        'arm_elbow_flex': 61.31621,
+        'arm_wrist_flex': 26.60682,
         'arm_wrist_roll': 0.0,
         'arm_gripper': 0.0
     }

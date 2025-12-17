@@ -2,8 +2,8 @@ import sys
 import os
 
 from src.arm_act_controller import arm_controller
-from src.arm_inverse_controller import p_control_loop, move_to_zero_position
-from src.robot_set_up import init_robot, get_robot, get_direction, reset_robot
+from src.arm_inverse_controller import p_control_loop, move_to_zero_position, return_to_start_position
+from src.robot_set_up import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.set_up import init_app, get_left, get_top, get_right, get_bottom, get_port, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status
 from src.utils import busy_wait
@@ -48,9 +48,10 @@ def main():
     for joint_name, position in start_positions.items():
         print(f"  {joint_name}: {position}°")
 
-    move_to_zero_position(robot, duration=2.0)
-
-    x0, y0 = 0.1629, 0.1131
+    # move_to_zero_position(robot, duration=2.0)
+    return_to_start_position(robot, get_target_positions(), 0.2, FPS)
+    # x0, y0 = 0.1629, 0.1131
+    x0, y0 = 0.0069, 0.0970
     current_x, current_y = x0, y0
     command_step = 0
     try:
