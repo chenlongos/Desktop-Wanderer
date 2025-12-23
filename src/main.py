@@ -19,14 +19,17 @@ from src.yolov.process import yolo_infer
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, get_log_level()))
 
-FPS = 50
+FPS = 20
 
-CATCH_ACTION = [("shoulder_pan", -8), ("wrist_flex", 58), ("gripper", 60), ("move_to", (0.1089, -0.075)),
+CATCH_ACTION = [("shoulder_pan", -8),
+                ("gripper", 50),
+                ("wrist_flex", 78),
+                ("move_to", (0.1349, 0.1211)),
+                ("move_to", (0.1349, -0.03)),
                 ("gripper", -40),
-                ("shoulder_pan", 8), ("move_to", (0.0, 0.13)), ("gripper", 50)]
-
-
-# CATCH_ACTION = [("shoulder_pan", -8),("wrist_flex", 48), ("open_gripper", 50), ("move_to", (0.1089, -0.06))]
+                ("shoulder_pan", 8),
+                ("move_to", (0.1, 0.13)),
+                ("gripper", 50)]
 
 
 def main():
@@ -49,8 +52,7 @@ def main():
         print(f"  {joint_name}: {position}°")
 
     return_to_start_position(robot, start_obs, get_target_positions(), 0.2, FPS)
-    # x0, y0 = 0.1629, 0.1131
-    x0, y0 = 0.0069, 0.0970
+    x0, y0 = 0.0989, 0.125
     current_x, current_y = x0, y0
     command_step = 0
     try:
