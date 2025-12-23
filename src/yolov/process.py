@@ -15,18 +15,29 @@ if HARDWARE_MODE == "310b":
 
     acl_resource = AclLiteResource()
     acl_resource.init()
-else:
+elif HARDWARE_MODE == "normal":
     import onnxruntime as ort
+elif HARDWARE_MODE == "rk3588":
+    from rknn.api import RKNN
+else:
+    raise ValueError(f"不支持的硬件模式: {HARDWARE_MODE}")
 
 # 初始化模型
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if HARDWARE_MODE == "310b":
     MODEL_PATH = os.path.join(BASE_DIR, 'models', 'tennis.om')
     model = AclLiteModel(MODEL_PATH)
-else:
+elif HARDWARE_MODE == "normal":
     MODEL_PATH = os.path.join(BASE_DIR, 'models', 'tennis.onnx')
     session = ort.InferenceSession(MODEL_PATH, providers=['CPUExecutionProvider'])
     input_name = session.get_inputs()[0].name
+elif HARDWARE_MODE == "rk3588":
+    MODEL_PATH = os.path.join(BASE_DIR, 'models', 'tennis.rknn')
+    rknn = RKNN()
+    rknn.load_rknn(MODEL_PATH)
+    rknn.init_runtime(target="rk3588")
+else:
+    raise ValueError(f"不支持的硬件模式: {HARDWARE_MODE}")
 
 img_size = 640
 
@@ -52,9 +63,11 @@ def yolo_infer(frame):
         input_img = np.transpose(input_img, (2, 0, 1))  # HWC->CHW
         input_img = np.expand_dims(input_img, axis=0)  # 添加批次维度
         outputs = model.execute([input_img])
-    else:
+    elif HARDWARE_MODE == "normal":
         blob = cv2.dnn.blobFromImage(input_img, scalefactor=1 / 255.0, size=(img_size, img_size), swapRB=True, crop=False)
         outputs = session.run(None, {input_name: blob})
+    elif HARDWARE_MODE == "rk3588":
+        outputs = rknn.inference(inputs=[input_img],data_format="nchw")
 
     pred = outputs[0].squeeze().T  # [C, N] -> [N, C]
 
