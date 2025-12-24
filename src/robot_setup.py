@@ -6,7 +6,7 @@ _start_positions = {
     'arm_shoulder_pan': 0.0,
     'arm_shoulder_lift': -31.70,
     'arm_elbow_flex': 27.69,
-    'arm_wrist_flex': 82.00,
+    'arm_wrist_flex': 88.00,
     'arm_wrist_roll': 0.0,
     'arm_gripper': 0.0
 }
@@ -19,7 +19,7 @@ _target_positions = {
     'arm_shoulder_pan': 0.0,
     'arm_shoulder_lift': -31.70,
     'arm_elbow_flex': 27.69,
-    'arm_wrist_flex': 82.00,
+    'arm_wrist_flex': 88.00,
     'arm_wrist_roll': 0.0,
     'arm_gripper': 0.0
 }

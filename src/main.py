@@ -5,7 +5,7 @@ from src.arm_act_controller import arm_controller
 from src.arm_inverse_controller import p_control_loop, return_to_start_position
 from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
-    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_hardware_mode
+    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_hardware_mode, get_fps
 from src.utils import busy_wait
 from src.move_controller import move_controller, get_empty_move_action, move_controller_for_bucket
 from src.yolov import get_red_bucket_local
@@ -20,18 +20,15 @@ from src.yolov.process import yolo_infer
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, get_log_level()))
 
-FPS = 20
-
 CATCH_ACTION = [("shoulder_pan", -8),
                 ("gripper", 50),
-                ("wrist_flex", 78),
-                ("move_to", (0.1349, 0.1211)),
-                ("move_to", (0.1349, -0.03)),
+                ("wrist_flex", 88),
+                ("move_to", (0.1200, 0.1211)),
+                ("move_to", (0.1300, -0.04)),
                 ("gripper", -40),
                 ("shoulder_pan", 8),
                 ("move_to", (0.1, 0.13)),
                 ("gripper", 50)]
-
 
 def main():
     init_app()
@@ -52,7 +49,7 @@ def main():
     for joint_name, position in start_positions.items():
         print(f"  {joint_name}: {position}°")
 
-    return_to_start_position(robot, start_obs, get_target_positions(), 0.2, FPS)
+    return_to_start_position(robot, start_obs, get_target_positions(), 0.2, get_fps())
     x0, y0 = 0.0989, 0.125
     current_x, current_y = x0, y0
     command_step = 0
@@ -113,7 +110,7 @@ def main():
                 move_action = move_controller_for_bucket(direction, result)
 
             _action_sent = robot.send_action({**arm_action, **move_action})
-            busy_wait(max(1.0 / FPS - (time.perf_counter() - t0), 0.0))
+            busy_wait(max(1.0 / get_fps() - (time.perf_counter() - t0), 0.0))
     finally:
         robot.disconnect()
 

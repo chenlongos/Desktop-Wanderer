@@ -18,6 +18,7 @@ class RobotControlModel(Enum):
 #
 _is_initialized: bool = False
 _hardware_mode: str = "normal"
+_fps: int = 20
 #
 _left: int = 0
 _top: int = 0
@@ -34,7 +35,7 @@ _control_mode: RobotControlModel = RobotControlModel.INVERSE
 
 
 def init_app():
-    global _is_initialized, _hardware_mode, _left, _top, _right, _bottom, _port, _log_level, _target_w, _target_h, _robot_status, _control_mode
+    global _is_initialized, _hardware_mode, _left, _top, _right, _bottom, _port, _log_level, _target_w, _target_h, _robot_status, _control_mode, _fps
     if _is_initialized:
         return
     print("Initializing...")
@@ -44,8 +45,8 @@ def init_app():
     _hardware_mode = config['hardware_mode']
     height, width = 480, 640
 
-    _target_w = min(height, width) // 3
-    _target_h = min(height, width) // 3
+    _target_w = min(height, width) // 5
+    _target_h = min(height, width) // 5
     _left = max(0, (width - _target_w) // 2)
     _top = max(0, (height - _target_h) // 2)
     _right = min(width, _left + _target_w)
@@ -58,7 +59,7 @@ def init_app():
         _control_mode = RobotControlModel.ACT
     else:
         _control_mode = RobotControlModel.INVERSE
-
+    _fps = config['fps']
 
     _is_initialized = True
 
@@ -133,3 +134,8 @@ def get_control_mode():
     if not _is_initialized:
         init_app()
     return _control_mode
+
+def get_fps():
+    if not _is_initialized:
+        init_app()
+    return _fps

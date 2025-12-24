@@ -40,13 +40,13 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
-        elif position < (TARGET_POSITION - 20) * 2:
+        elif position < (TARGET_POSITION - 8) * 2:
             if TARGET_POSITION - position < target_h:
                 action = direction.get_action("forward", 0)
             else:
                 action = direction.get_action("forward")
             _cycle_time = 0
-        elif position > (TARGET_POSITION + 20) * 2:
+        elif position > (TARGET_POSITION + 10) * 2:
             action = direction.get_action("backward", 0)
             _cycle_time = 0
         else:
