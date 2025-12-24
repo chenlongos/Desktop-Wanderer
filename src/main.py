@@ -23,8 +23,8 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 CATCH_ACTION = [("shoulder_pan", -8),
                 ("gripper", 50),
                 ("wrist_flex", 88),
-                ("move_to", (0.1200, 0.1211)),
-                ("move_to", (0.1300, -0.04)),
+                ("move_to", (0.0700, 0.1211)),
+                ("move_to", (0.0700, -0.04)),
                 ("gripper", -40),
                 ("shoulder_pan", 8),
                 ("move_to", (0.1, 0.13)),
@@ -64,7 +64,7 @@ def main():
             else:
                 result = yolo_infer(frame)
 
-            if get_hardware_mode() == 'normal':
+            if get_hardware_mode() == 'normal' and True:
                 for box in result:
                     x, y, w, h = box.x, box.y, box.w, box.h
                     center_x = x + w // 2

@@ -2,7 +2,7 @@ class DirectionControl:
     def __init__(self):
         # 速度档位
         self.speed_levels = [
-            {"xy": 0.1, "theta": 30},   # 慢
+            {"xy": 0.05, "theta": 30},   # 慢
             {"xy": 0.25, "theta": 60},  # 中
             {"xy": 0.4, "theta": 90},   # 快
         ]

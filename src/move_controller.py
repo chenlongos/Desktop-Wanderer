@@ -23,25 +23,25 @@ _last_ball_center_x = None
 def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
     global _cycle_time, _last_ball_center_x
     if result and len(result) > 0:
-        box = get_nearly_target_box(result, TARGET_CX, TARGET_CY)
+        box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
         position = max(w, h)
         _last_ball_center_x = center_x
         if center_x < left:
-            if abs(TARGET_CX - center_x) < target_w:
+            if abs(TARGET_CX - center_x) < target_w * 1.5:
                 action = direction.get_action("rotate_left", 0)
             else:
                 action = direction.get_action("rotate_left")
             _cycle_time = 0
         elif center_x > right:
-            if abs(TARGET_CX - center_x) < target_w:
+            if abs(TARGET_CX - center_x) < target_w * 1.5:
                 action = direction.get_action("rotate_right", 0)
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
         elif position < (TARGET_POSITION - 8) * 2:
-            if TARGET_POSITION - position < target_h:
+            if position * 2 > TARGET_POSITION:
                 action = direction.get_action("forward", 0)
             else:
                 action = direction.get_action("forward")
@@ -69,7 +69,7 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
 def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
     global _cycle_time, _last_ball_center_x
     if result and len(result) > 0:
-        box = get_nearly_target_box(result, TARGET_CX, TARGET_CY)
+        box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
         position = max(w, h)

@@ -67,7 +67,7 @@ def yolo_infer(frame):
         blob = cv2.dnn.blobFromImage(input_img, scalefactor=1 / 255.0, size=(img_size, img_size), swapRB=True, crop=False)
         outputs = session.run(None, {input_name: blob})
     elif HARDWARE_MODE == "rk3588":
-        outputs = rknn.inference(inputs=[input_img],data_format="nchw")
+        outputs = rknn.inference(inputs=[input_img])
 
     pred = outputs[0].squeeze().T  # [C, N] -> [N, C]
 
