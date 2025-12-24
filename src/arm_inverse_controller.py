@@ -1,6 +1,7 @@
 import math
 import time
 import traceback
+from time import sleep
 
 from src.robot_setup import get_target_positions, get_pitch, set_pitch
 
@@ -22,8 +23,8 @@ joint_controls = {
 
 # x,y coordinate control
 xy_controls = {
-    'x': 0.004,  # x increase
-    'y': 0.004,  # y increase
+    'x': 0.005,  # x increase
+    'y': 0.005,  # y increase
 }
 
 
@@ -49,6 +50,9 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
 
     try:
         cmd_name = cmd[0]
+        if cmd_name == "gap":
+            sleep(0.1)
+
         if cmd_name == 'move_to':
             cmd_x = cmd[1][0]
             cmd_y = cmd[1][1]
@@ -71,7 +75,7 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
         if len(wrist_command_list) > 0:
             for key, value in wrist_command_list:
                 if key == 'wrist_flex':
-                    pitch += value
+                    pitch = value
             set_pitch(pitch)
 
         if len(joint_command_list) > 0:

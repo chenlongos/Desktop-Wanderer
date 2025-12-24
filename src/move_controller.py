@@ -72,7 +72,7 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
-        position = max(w, h)
+        position = min(w, h)
         _last_ball_center_x = center_x
         if center_x < left:
             if abs(TARGET_CX - center_x) < target_w:
@@ -86,13 +86,13 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
-        elif position < (TARGET_POSITION - 20) * 2:
+        elif position < TARGET_POSITION * 2.6:
             if TARGET_POSITION - position < target_h:
                 action = direction.get_action("forward", 0)
             else:
                 action = direction.get_action("forward")
             _cycle_time = 0
-        elif position > (TARGET_POSITION + 20) * 2:
+        elif position > TARGET_POSITION * 3:
             action = direction.get_action("backward", 0)
             _cycle_time = 0
         else:

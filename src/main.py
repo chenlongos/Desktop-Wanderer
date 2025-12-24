@@ -25,10 +25,13 @@ CATCH_ACTION = [("shoulder_pan", -8),
                 ("wrist_flex", 88),
                 ("move_to", (0.0700, 0.1211)),
                 ("move_to", (0.0700, -0.04)),
+                ("gap", 0),
                 ("gripper", -40),
                 ("shoulder_pan", 8),
-                ("move_to", (0.1, 0.13)),
-                ("gripper", 50)]
+                ("move_to", (0.07, 0.24)),
+                ("wrist_flex", 8)
+                ]
+
 
 def main():
     init_app()
@@ -49,7 +52,7 @@ def main():
     for joint_name, position in start_positions.items():
         print(f"  {joint_name}: {position}°")
 
-    return_to_start_position(robot, start_obs, get_target_positions(), 0.2, get_fps())
+    return_to_start_position(robot, start_obs, get_target_positions(), 0.9, get_fps())
     x0, y0 = 0.0989, 0.125
     current_x, current_y = x0, y0
     command_step = 0
@@ -95,15 +98,19 @@ def main():
                                 current_y - CATCH_ACTION[command_step][1][1]) < 0.005:
                             command_step += 1
                             if command_step == len(CATCH_ACTION):
-                                set_robot_status(RobotStatus.SEARCH)
-                                reset_robot()
+                                set_robot_status(RobotStatus.FIND_BUCKET)
                                 command_step = 0
                     else:
                         command_step += 1
                         if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.SEARCH)
-                            reset_robot()
+                            set_robot_status(RobotStatus.FIND_BUCKET)
                             command_step = 0
+            elif get_robot_status() == RobotStatus.PUT_BALL:
+                arm_action, current_x, current_y = p_control_loop(("gripper", 50),
+                                                                  current_x,
+                                                                  current_y, current_obs, kp=0.5)
+                set_robot_status(RobotStatus.SEARCH)
+                reset_robot()
             elif get_robot_status() == RobotStatus.SEARCH:
                 move_action = move_controller(direction, result)
             elif get_robot_status() == RobotStatus.FIND_BUCKET:

@@ -23,7 +23,7 @@ _target_positions = {
     'arm_wrist_roll': 0.0,
     'arm_gripper': 0.0
 }
-_pitch = 0.0
+_pitch = 80.0
 
 
 def init_robot():
@@ -83,7 +83,7 @@ def reset_pitch():
     global _pitch
     if not _is_robot_initialized:
         init_robot()
-    _pitch = 0.0
+    _pitch = 88.0
 
 def reset_robot():
     global _is_robot_initialized, _target_positions, _pitch
