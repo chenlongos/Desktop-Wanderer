@@ -30,24 +30,24 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         _last_ball_center_x = center_x
         if center_x < left: # 如果球位于目标框左侧
             if abs(TARGET_CX - center_x) < target_w * 1.5: # 球与目标框中点距离小于目标框的1.5倍，慢速前进
-                action = direction.get_action("rotate_left", 0)
+                action = direction.get_action("rotate_left", 1)
             else:
                 action = direction.get_action("rotate_left")
             _cycle_time = 0
         elif center_x > right: # 如果球位于目标框右侧
             if abs(TARGET_CX - center_x) < target_w * 1.5: # 与目标框中点距离小于目标框的1.5倍，慢速前进
-                action = direction.get_action("rotate_right", 0)
+                action = direction.get_action("rotate_right", 1)
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
         elif position < (TARGET_POSITION - 8) * 2: # 如果球在摄像头中的直径小于，目标框-8的2倍 ，则前进（可调）
-            if position * 2 > TARGET_POSITION:
+            if position * 1 > TARGET_POSITION:
                 action = direction.get_action("forward", 0)
             else:
                 action = direction.get_action("forward")
             _cycle_time = 0
         elif position > (TARGET_POSITION + 10) * 2: # 如果球在摄像头中的直径大于，目标框+10的2倍 ，则后退（可调）
-            action = direction.get_action("backward", 0)
+            action = direction.get_action("backward", 1)
             _cycle_time = 0
         else:
             action = direction.get_action(None)
@@ -59,9 +59,9 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         if _last_ball_center_x is not None:
             frame_center = (left + right) // 2
             if _last_ball_center_x < frame_center:
-                action = direction.get_action("rotate_left", 0)
+                action = direction.get_action("rotate_left", 1)
             else:
-                action = direction.get_action("rotate_right", 0)
+                action = direction.get_action("rotate_right", 1)
         else:
             action = direction.get_action(None)
     return action
@@ -76,13 +76,13 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
         _last_ball_center_x = center_x
         if center_x < left: # 如果桶位于目标框左侧
             if abs(TARGET_CX - center_x) < target_w:
-                action = direction.get_action("rotate_left", 0)
+                action = direction.get_action("rotate_left", 1)
             else:
                 action = direction.get_action("rotate_left")
             _cycle_time = 0
         elif center_x > right: # 如果桶位于目标框右侧
             if abs(TARGET_CX - center_x) < target_w:
-                action = direction.get_action("rotate_right", 0)
+                action = direction.get_action("rotate_right", 1)
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
@@ -93,7 +93,7 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
                 action = direction.get_action("forward")
             _cycle_time = 0
         elif position > TARGET_POSITION * 3: # 如果桶在摄像头中的直径大于目标框的3倍，则后退
-            action = direction.get_action("backward", 0)
+            action = direction.get_action("backward", 1)
             _cycle_time = 0
         else:
             action = direction.get_action(None)
@@ -105,9 +105,9 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
         if _last_ball_center_x is not None:
             frame_center = (left + right) // 2
             if _last_ball_center_x < frame_center:
-                action = direction.get_action("rotate_left", 0)
+                action = direction.get_action("rotate_left", 1)
             else:
-                action = direction.get_action("rotate_right", 0)
+                action = direction.get_action("rotate_right", 1)
         else:
             action = direction.get_action(None)
     return action

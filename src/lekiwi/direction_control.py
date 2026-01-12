@@ -2,11 +2,12 @@ class DirectionControl:
     def __init__(self):
         # 速度档位
         self.speed_levels = [
+            {"xy": 0.02, "theta": 15},  # 特慢
             {"xy": 0.05, "theta": 30},   # 慢
             {"xy": 0.25, "theta": 60},  # 中
             {"xy": 0.4, "theta": 90},   # 快
         ]
-        self.speed_index = 1  # 默认中速
+        self.speed_index = 2  # 默认中速
 
     def get_action(self, target, speed=None):
         if speed is None:
