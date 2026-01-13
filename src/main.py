@@ -64,6 +64,14 @@ def main():
             current_obs = robot.get_observation()
             frame = current_obs["front"]
             if get_robot_status() == RobotStatus.FIND_BUCKET:
+                gripper_pos = current_obs.get('arm_gripper.pos', 5)
+                is_gripper_holding = gripper_pos > 25
+
+                if is_gripper_holding is False:
+                    set_robot_status(RobotStatus.SEARCH)
+                    reset_robot()
+                    continue
+
                 result = get_red_bucket_local(frame) # 找桶的算法
             else:
                 result = yolo_infer(frame) # 找球的算法
