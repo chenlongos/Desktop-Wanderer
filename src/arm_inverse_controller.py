@@ -22,10 +22,12 @@ joint_controls = {
     'gripper': 'arm_gripper',  # Joint 6 increase
 }
 
-# x,y coordinate control
-xy_controls = {
-    'x': 0.005,  # x increase
-    'y': 0.005,  # y increase
+# --- 新增：运动控制参数配置 ---
+MOTION_PARAMS = {
+    'max_step': 0.01,  # 最大步长 (距离远时，每帧移动 2cm) - "快"
+    'min_step': 0.001,  # 最小步长 (精细调整时，每帧移动 1mm) - "准"
+    'slow_dist': 0.05,  # 减速距离 (距离目标 5cm 以内开始减速)
+    'dead_zone': 0.0005  # 死区 (误差小于 0.5mm 认为到达，停止计算)
 }
 
 
@@ -49,25 +51,69 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
     joint_command_list = []
     wrist_command_list = []
 
+    # 初始化位移增量
+    delta_x = 0.0
+    delta_y = 0.0
+
     try:
         cmd_name = cmd[0]
         if cmd_name == "gap":
             sleep(0.1)
 
+        # ---------------------------------------------------------
+        # 修改部分：实现分段与自适应移动 (X, Y 坐标控制)
+        # ---------------------------------------------------------
         if cmd_name == 'move_to':
-            cmd_x = cmd[1][0]
-            cmd_y = cmd[1][1]
+            target_x = cmd[1][0]
+            target_y = cmd[1][1]
 
-            if cmd_x > current_x:
-                move_command_list.append(('x', 1))
-            if cmd_x < current_x:
-                move_command_list.append(('x', -1))
-            if cmd_y > current_y:
-                move_command_list.append(('y', 1))
-            if cmd_y < current_y:
-                move_command_list.append(('y', -1))
+            # 1. 计算当前与目标的误差矢量
+            error_x = target_x - current_x
+            error_y = target_y - current_y
 
-        if cmd_name in joint_controls:
+            # 2. 计算欧几里得距离 (总误差)
+            distance = math.sqrt(error_x ** 2 + error_y ** 2)
+
+            # 3. 自适应速度规划逻辑
+            if distance < MOTION_PARAMS['dead_zone']:
+                # 到达目标附近，停止移动
+                step_size = 0.0
+            elif distance > MOTION_PARAMS['slow_dist']:
+                # 距离远：全速前进
+                step_size = MOTION_PARAMS['max_step']
+            else:
+                # 距离近：线性减速 (P控制: Speed = dist * gain)
+                # 计算比例：距离越近，速度越慢
+                ratio = distance / MOTION_PARAMS['slow_dist']
+                step_size = MOTION_PARAMS['max_step'] * ratio
+
+                # 保证有一个最小速度，否则最后几毫米会永远走不到
+                if step_size < MOTION_PARAMS['min_step']:
+                    step_size = MOTION_PARAMS['min_step']
+
+                # 防止超调：如果步长大于剩余距离，直接一步到位
+                if step_size > distance:
+                    step_size = distance
+
+            # 4. 计算分量 (保持直线移动)
+            if distance > 1e-6:  # 防止除以零
+                delta_x = (error_x / distance) * step_size
+                delta_y = (error_y / distance) * step_size
+            else:
+                delta_x = 0
+                delta_y = 0
+
+            # 更新当前坐标
+            current_x += delta_x
+            current_y += delta_y
+
+            # Debug 日志 (可选，用于调试参数)
+            # logging.debug(f"Dist: {distance:.4f}, Step: {step_size:.4f}, CurX: {current_x:.3f}, CurY: {current_y:.3f}")
+
+        # ---------------------------------------------------------
+        # 处理关节直接控制命令
+        # ---------------------------------------------------------
+        elif cmd_name in joint_controls:
             joint_command_list.append(cmd)
         else:
             wrist_command_list.append(cmd)
@@ -79,6 +125,7 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
                     pitch = value
             set_pitch(pitch)
 
+        # 处理关节更新
         if len(joint_command_list) > 0:
             for key, value in joint_command_list:
                 joint_name = joint_controls[key]
@@ -88,14 +135,10 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
                     target_positions[joint_name] = new_target
                     logging.debug(f"Update target position {joint_name}: {current_target} -> {new_target}")
 
-        if len(move_command_list) > 0:
-            for key, value in move_command_list:
-                delta = xy_controls[key]
-                if key == 'x':
-                    current_x += delta * value
-                elif key == 'y':
-                    current_y += delta * value
-
+        # ---------------------------------------------------------
+        # 更新逆运动学解 (只有在 X 或 Y 发生变化时才计算)
+        # ---------------------------------------------------------
+        if abs(delta_x) > 0 or abs(delta_y) > 0:
             # Calculate target angles for joint2 and joint3
             joint2_target, joint3_target = inverse_kinematics(current_x, current_y)
             target_positions['arm_shoulder_lift'] = joint2_target
@@ -108,14 +151,6 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
         if 'arm_shoulder_lift' in target_positions and 'arm_elbow_flex' in target_positions:
             target_positions['arm_wrist_flex'] = - target_positions['arm_shoulder_lift'] - target_positions[
                 'arm_elbow_flex'] + pitch
-            # Show current pitch value (display every 100 steps to avoid screen flooding)
-        if hasattr(p_control_loop, 'step_counter'):
-            p_control_loop.step_counter += 1
-        else:
-            p_control_loop.step_counter = 0
-        if p_control_loop.step_counter % 100 == 0:
-            logging.debug(
-                f"Current pitch adjustment: {pitch:.3f}, wrist_flex target: {target_positions['arm_wrist_flex']:.3f}")
 
         # Extract current joint positions
         current_positions = {}
@@ -126,7 +161,7 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
                 calibrated_value = apply_joint_calibration(motor_name, value)
                 current_positions[motor_name] = calibrated_value
 
-        # P control calculation
+        # P control calculation (关节层面的 P 控制)
         robot_action = {}
         for joint_name, target_pos in target_positions.items():
             if joint_name in current_positions:
@@ -142,8 +177,9 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
 
         if robot_action:
             return robot_action, current_x, current_y
+
     except Exception as e:
-        logging.debug(f"P control loop error: {e}")
+        logging.error(f"P control loop error: {e}")
         traceback.print_exc()
         return {}, current_x, current_y
 
