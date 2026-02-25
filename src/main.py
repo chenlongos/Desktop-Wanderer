@@ -21,15 +21,15 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, get_log_level()))
 
 # 夹球的动作序列
-CATCH_ACTION = [("shoulder_pan", -15), # 对应1号舵机
+CATCH_ACTION = [("shoulder_pan", -14), # 对应1号舵机
                 ("gripper", 50), # 夹爪打开
                 ("wrist_flex", 88),  # 腕部舵机转动角度
-                ("move_to", (0.0450, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                ("move_to", (0.0450, -0.04)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                ("move_to", (0.0490, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
+                ("move_to", (0.0490, -0.04)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ("gap", 0), # 停顿指令
                 ("gripper", -50), # 夹爪关闭
                 ("gap", 0), # 停顿指令
-                ("shoulder_pan", 15), # 1号舵机归位
+                ("shoulder_pan", 14), # 1号舵机归位
                 ("move_to", (0.07, 0.24)), # 把球举起
                 ("wrist_flex", 8) # 腕部配合移动
                 ]

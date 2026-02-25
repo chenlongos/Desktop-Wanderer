@@ -4,8 +4,8 @@ class DirectionControl:
         self.speed_levels = [
             {"xy": 0.02, "theta": 15},  # 特慢
             {"xy": 0.05, "theta": 30},   # 慢
-            {"xy": 0.25, "theta": 60},  # 中
-            {"xy": 0.4, "theta": 90},   # 快
+            {"xy": 0.25, "theta": 50},  # 中
+            {"xy": 0.4, "theta": 80},   # 快
         ]
         self.speed_index = 2  # 默认中速
 

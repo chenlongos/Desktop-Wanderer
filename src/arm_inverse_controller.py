@@ -58,7 +58,7 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
     try:
         cmd_name = cmd[0]
         if cmd_name == "gap":
-            sleep(0.5)
+            sleep(0.2)
 
         # ---------------------------------------------------------
         # 修改部分：实现分段与自适应移动 (X, Y 坐标控制)

@@ -59,9 +59,9 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         if _last_ball_center_x is not None:
             frame_center = (left + right) // 2
             if _last_ball_center_x < frame_center:
-                action = direction.get_action("rotate_left", 1)
+                action = direction.get_action("rotate_left")
             else:
-                action = direction.get_action("rotate_right", 1)
+                action = direction.get_action("rotate_right")
         else:
             action = direction.get_action(None)
     return action
@@ -76,13 +76,13 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
         _last_ball_center_x = center_x
         if center_x < left: # 如果桶位于目标框左侧
             if abs(TARGET_CX - center_x) < target_w:
-                action = direction.get_action("rotate_left", 1)
+                action = direction.get_action("rotate_left")
             else:
                 action = direction.get_action("rotate_left")
             _cycle_time = 0
         elif center_x > right: # 如果桶位于目标框右侧
             if abs(TARGET_CX - center_x) < target_w:
-                action = direction.get_action("rotate_right", 1)
+                action = direction.get_action("rotate_right")
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
@@ -105,9 +105,9 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
         if _last_ball_center_x is not None:
             frame_center = (left + right) // 2
             if _last_ball_center_x < frame_center:
-                action = direction.get_action("rotate_left", 1)
+                action = direction.get_action("rotate_left")
             else:
-                action = direction.get_action("rotate_right", 1)
+                action = direction.get_action("rotate_right")
         else:
             action = direction.get_action(None)
     return action
