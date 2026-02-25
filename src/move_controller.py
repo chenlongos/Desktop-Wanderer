@@ -40,13 +40,13 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
-        elif position < (TARGET_POSITION - 8) * 2: # 如果球在摄像头中的直径小于，目标框-8的2倍 ，则前进（可调）
-            if position * 1 > TARGET_POSITION:
+        elif position < (TARGET_POSITION) * 2: # 如果球在摄像头中的直径小于，目标框-8的2倍 ，则前进（可调）
+            if position * 0.8 > TARGET_POSITION:
                 action = direction.get_action("forward", 0)
             else:
-                action = direction.get_action("forward")
+                action = direction.get_action("forward", 3)
             _cycle_time = 0
-        elif position > (TARGET_POSITION + 10) * 2: # 如果球在摄像头中的直径大于，目标框+10的2倍 ，则后退（可调）
+        elif position > (TARGET_POSITION + 20) * 2: # 如果球在摄像头中的直径大于，目标框+10的2倍 ，则后退（可调）
             action = direction.get_action("backward", 1)
             _cycle_time = 0
         else:

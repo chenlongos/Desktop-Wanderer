@@ -21,14 +21,15 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, get_log_level()))
 
 # 夹球的动作序列
-CATCH_ACTION = [("shoulder_pan", -11), # 对应1号舵机
+CATCH_ACTION = [("shoulder_pan", -15), # 对应1号舵机
                 ("gripper", 50), # 夹爪打开
                 ("wrist_flex", 88),  # 腕部舵机转动角度
-                ("move_to", (0.0750, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                ("move_to", (0.0750, -0.04)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                ("move_to", (0.0450, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
+                ("move_to", (0.0450, -0.04)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ("gap", 0), # 停顿指令
-                ("gripper", -40), # 夹爪关闭
-                ("shoulder_pan", 11), # 1号舵机归位
+                ("gripper", -50), # 夹爪关闭
+                ("gap", 0), # 停顿指令
+                ("shoulder_pan", 15), # 1号舵机归位
                 ("move_to", (0.07, 0.24)), # 把球举起
                 ("wrist_flex", 8) # 腕部配合移动
                 ]
@@ -101,10 +102,10 @@ def main():
                 else:
                     arm_action, current_x, current_y = p_control_loop(CATCH_ACTION[command_step],
                                                                       current_x,
-                                                                      current_y, current_obs, kp=0.5)
+                                                                      current_y, current_obs, kp=0.8)
                     if CATCH_ACTION[command_step][0] == "move_to":
-                        if abs(current_x - CATCH_ACTION[command_step][1][0]) < 0.005 and abs(
-                                current_y - CATCH_ACTION[command_step][1][1]) < 0.005:
+                        if abs(current_x - CATCH_ACTION[command_step][1][0]) < 0.002 and abs(
+                                current_y - CATCH_ACTION[command_step][1][1]) < 0.002:
                             command_step += 1
                             if command_step == len(CATCH_ACTION):
                                 set_robot_status(RobotStatus.FIND_BUCKET)
@@ -126,7 +127,8 @@ def main():
                 move_action = move_controller_for_bucket(direction, result)
 
             _action_sent = robot.send_action({**arm_action, **move_action})
-            busy_wait(max(1.0 / get_fps() - (time.perf_counter() - t0), 0.0))
+            if get_robot_status() != RobotStatus.PICK:
+                busy_wait(max(1.0 / get_fps() - (time.perf_counter() - t0), 0.0))
     finally:
         robot.disconnect()
 
