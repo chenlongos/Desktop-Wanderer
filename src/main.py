@@ -73,7 +73,7 @@ def main():
                     continue
 
                 result = get_red_bucket_local(frame) # 找桶的算法
-            else:
+            elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 
             if get_hardware_mode() == 'normal': # 摄像头视角显示，
