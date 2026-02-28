@@ -133,3 +133,74 @@ def get_red_bucket_local(frame):
             boxes.append(box)
 
     return boxes
+
+
+def get_black_bucket_local(frame):
+    # 转换色彩空间
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    # 拉高饱和度，消除光的影响
+    hsv[:, :, 1] = np.clip(hsv[:, :, 1] * 1.5, 0, 255).astype(np.uint8)
+
+    # 定义黑色的 HSV 范围
+    lower_black = np.array([0, 0, 0])
+    upper_black = np.array([180, 255, 80])
+
+    # 创建掩膜
+    mask = cv2.inRange(hsv, lower_black, upper_black)
+
+    # 形态学操作：开运算 + 腐蚀
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+    # 保存开运算后的mask，用于后续补救
+    mask_before_erode = mask.copy()
+
+    # 腐蚀：分离相连的两个色块
+    mask = cv2.erode(mask, kernel, iterations=4)
+
+    # 连通域分析
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+
+    candidates = []
+    for i in range(1, num_labels):
+        x, y, w, h, area = stats[i]
+
+        # 过滤太小的区域
+        if area < 1000:
+            continue
+
+        # 过滤长宽比例
+        aspect_ratio = w / h if h > 0 else 0
+        if aspect_ratio < 1 or aspect_ratio > 4:
+            continue
+
+        # 过滤框内黑色比例
+        roi = mask[y:y+h, x:x+w]
+        black_pixels = cv2.countNonZero(roi)
+        total_pixels = w * h
+        black_ratio = black_pixels / total_pixels if total_pixels > 0 else 0
+
+        if black_ratio < 0.7:
+            # 用原始mask再检查一次
+            roi_before = mask_before_erode[y:y+h, x:x+w]
+            black_pixels_before = cv2.countNonZero(roi_before)
+            black_ratio_before = black_pixels_before / total_pixels if total_pixels > 0 else 0
+            if black_ratio_before < 0.7:
+                continue
+
+        # 计算矩形度
+        rect_area = w * h
+        rectangularity = area / rect_area if rect_area > 0 else 0
+
+        candidates.append((area, rectangularity, x, y, w, h))
+
+    if not candidates:
+        return []
+
+    # 按矩形度降序，再按面积降序
+    candidates.sort(key=lambda x: (x[1], x[0]), reverse=True)
+
+    # 返回最接近矩形且面积最大的那个
+    _, _, x, y, w, h = candidates[0]
+    return [Box(int(x), int(y), int(w), int(h))]

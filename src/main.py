@@ -1,21 +1,20 @@
-import sys
 import os
+import sys
 
 from src.arm_act_controller import arm_controller
 from src.arm_inverse_controller import p_control_loop, return_to_start_position
+from src.move_controller import move_controller, get_empty_move_action, move_controller_for_bucket
 from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_hardware_mode, get_fps
 from src.utils import busy_wait
-from src.move_controller import move_controller, get_empty_move_action, move_controller_for_bucket
-from src.yolov import get_red_bucket_local
+from src.yolov import yolo_infer, get_black_bucket_local
 
 sys.path.append(os.path.dirname(__file__))
 import time
 import logging
 import cv2
 
-from src.yolov.process import yolo_infer
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, get_log_level()))
@@ -24,8 +23,8 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 CATCH_ACTION = [("shoulder_pan", -14), # 对应1号舵机
                 ("gripper", 50), # 夹爪打开
                 ("wrist_flex", 88),  # 腕部舵机转动角度
-                ("move_to", (0.0490, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                ("move_to", (0.0490, -0.04)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                ("move_to", (0.18, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
+                ("move_to", (0.18, -0.02)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ("gap", 0), # 停顿指令
                 ("gripper", -50), # 夹爪关闭
                 ("gap", 0), # 停顿指令
@@ -68,12 +67,12 @@ def main():
                 gripper_pos = current_obs.get('arm_gripper.pos', 5)
                 is_gripper_holding = gripper_pos > 25
 
-                if is_gripper_holding is False:
+                if not is_gripper_holding:
                     set_robot_status(RobotStatus.SEARCH)
                     reset_robot()
                     continue
 
-                result = get_red_bucket_local(frame) # 找桶的算法
+                result = get_black_bucket_local(frame) # 找桶的算法
             elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 

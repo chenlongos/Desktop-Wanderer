@@ -45,7 +45,7 @@ def init_app():
     _hardware_mode = config['hardware_mode']
     height, width = 480, 640
 
-    _target_w = min(height, width) // 3
+    _target_w = (min(height, width) // 3) - 10
     _target_h = min(height, width) // 3
     _left = max(0, (width - _target_w) // 2)
     _top = max(0, (height - _target_h) // 2)
