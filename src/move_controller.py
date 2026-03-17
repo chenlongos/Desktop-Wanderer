@@ -86,7 +86,7 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
-        elif position < TARGET_POSITION * 2.6: # 如果桶在摄像头中的直径小于目标框的2.6倍，则前进
+        elif position < TARGET_POSITION * 2.2: # 如果桶在摄像头中的直径小于目标框的2.6倍，则前进
             if TARGET_POSITION - position < target_h: # 保证快速前进，if可以去掉
                 action = direction.get_action("forward")
             else:
