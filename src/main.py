@@ -20,11 +20,13 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=getattr(logging, get_log_level()))
 
 # 夹球的动作序列
-CATCH_ACTION = [("shoulder_pan", -12), # 对应1号舵机
+CATCH_ACTION = [
+                ("move_to", (0.0989, 0.125)),
+                ("shoulder_pan", -12), # 对应1号舵机
                 ("gripper", 60), # 夹爪打开
-                # ("wrist_flex", 80),  # 腕部舵机转动角度q
-                ("move_to", (0.16, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                ("move_to", (0.16, -0.02)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                ("wrist_flex", 80),  # 腕部舵机转动角度q
+                ("move_to", (0.17, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
+                ("move_to", (0.17, -0.02)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ("gap", 0), # 停顿指令
                 ("gripper", -60), # 夹爪关闭
                 ("gap", 0), # 停顿指令
@@ -34,8 +36,11 @@ CATCH_ACTION = [("shoulder_pan", -12), # 对应1号舵机
                 ]
 
 PUT_ACTION = [
+    ("move_to", (0.10, 0.2)), # 向前伸
     ("gripper", 60),
     ("gap", 0), # 停顿指令
+    ("move_to", (0.00, 0.2)), # 回收
+    ("wrist_flex", 80)
 ]
 
 def main():
@@ -121,12 +126,21 @@ def main():
             elif get_robot_status() == RobotStatus.PUT_BALL:
                 arm_action, current_x, current_y = p_control_loop(PUT_ACTION[command_step],
                                                                   current_x,
-                                                                  current_y, current_obs, kp=0.5)
-                command_step += 1
-                if command_step == len(PUT_ACTION):
-                    set_robot_status(RobotStatus.SEARCH)
-                    reset_robot()
-                    command_step = 0
+                                                                  current_y, current_obs, kp=0.9)
+                if PUT_ACTION[command_step][0] == "move_to":
+                    if abs(current_x - PUT_ACTION[command_step][1][0]) < 0.002 and abs(
+                            current_y - PUT_ACTION[command_step][1][1]) < 0.002:
+                        command_step += 1
+                        if command_step == len(PUT_ACTION):
+                            set_robot_status(RobotStatus.SEARCH)
+                            reset_robot()
+                            command_step = 0
+                else:
+                    command_step += 1
+                    if command_step == len(PUT_ACTION):
+                        set_robot_status(RobotStatus.SEARCH)
+                        reset_robot()
+                        command_step = 0
             elif get_robot_status() == RobotStatus.SEARCH:
                 move_action = move_controller(direction, result)
             elif get_robot_status() == RobotStatus.FIND_BUCKET:
