@@ -36,7 +36,8 @@ CATCH_ACTION = [
                 ]
 
 PUT_ACTION = [
-    ("move_to", (0.10, 0.2)), # 向前伸
+    ("shoulder_lift", 50),
+    ("gap", 0),  # 停顿指令
     ("gripper", 60),
     ("gap", 0), # 停顿指令
     ("move_to", (-0.1, 0.2)), # 回收
@@ -128,7 +129,7 @@ def main():
             elif get_robot_status() == RobotStatus.PUT_BALL:
                 arm_action, current_x, current_y = p_control_loop(PUT_ACTION[command_step],
                                                                   current_x,
-                                                                  current_y, current_obs, kp=0.9)
+                                                                  current_y, current_obs, kp=0.8)
                 if PUT_ACTION[command_step][0] == "move_to":
                     if abs(current_x - PUT_ACTION[command_step][1][0]) < 0.002 and abs(
                             current_y - PUT_ACTION[command_step][1][1]) < 0.002:

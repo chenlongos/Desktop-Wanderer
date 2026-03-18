@@ -18,6 +18,7 @@ JOINT_CALIBRATION = [
 # Joint control mapping
 joint_controls = {
     'shoulder_pan': 'arm_shoulder_pan',  # Joint 1 decrease
+    'shoulder_lift': 'arm_shoulder_lift', # Joint 2 decrease
     'wrist_roll': 'arm_wrist_roll',  # Joint 5 increase
     'gripper': 'arm_gripper',  # Joint 6 increase
 }
