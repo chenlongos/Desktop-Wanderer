@@ -8,7 +8,7 @@ from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, g
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_hardware_mode, get_fps
 from src.utils import busy_wait
-from src.yolov import yolo_infer, get_black_bucket_local
+from src.yolov import yolo_infer, get_black_bucket_local, get_red_bucket_local
 
 sys.path.append(os.path.dirname(__file__))
 import time
@@ -82,6 +82,8 @@ def main():
                     continue
 
                 result = get_black_bucket_local(frame) # 找桶的算法
+                if len(result) == 0:
+                    result = get_red_bucket_local(frame)
             elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 
