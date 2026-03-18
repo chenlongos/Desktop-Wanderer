@@ -8,7 +8,7 @@ _start_positions = {
     'arm_elbow_flex': 27.69,
     'arm_wrist_flex': 80.00,
     'arm_wrist_roll': 0.0,
-    'arm_gripper': 0.0
+    'arm_gripper': 10.0
 }
 
 _is_robot_initialized = False
@@ -21,7 +21,7 @@ _target_positions = {
     'arm_elbow_flex': 27.69,
     'arm_wrist_flex': 80.00,
     'arm_wrist_roll': 0.0,
-    'arm_gripper': 0.0
+    'arm_gripper': 10.0
 }
 _pitch = 80.0
 
@@ -65,7 +65,7 @@ def reset_target_positions():
         'arm_elbow_flex': 27.69,
         'arm_wrist_flex': 80.00,
         'arm_wrist_roll': 0.0,
-        'arm_gripper': 0.0
+        'arm_gripper': 10.0
     }
 
 def get_pitch():
