@@ -82,9 +82,9 @@ def main():
                     reset_robot()
                     continue
 
-                result = get_black_bucket_local(frame) # 找桶的算法
-                if len(result) == 0:
-                    result = get_red_bucket_local(frame)
+                # result = get_black_bucket_local(frame) # 找桶的算法
+                # if len(result) == 0:
+                result = get_red_bucket_local(frame)
             elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 

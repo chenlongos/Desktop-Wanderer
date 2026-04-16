@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 def lekiwi_cameras_config() -> dict[str, CameraConfig]:
     return {
         "front": OpenCVCameraConfig(
-            index_or_path=0, fps=30, width=640, height=480, color_mode=ColorMode.BGR
+            index_or_path=0, fps=30, width=640, height=480, color_mode=ColorMode.BGR,
+            warmup_s=3
         ),
     }
 

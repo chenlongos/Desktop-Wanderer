@@ -40,7 +40,7 @@ adb shell
 
 # ssh连接
 sudo ip a add 192.168.1.2/24 dev <ethN>	# 设置主机的ip地址
-ssh orangepi@192.168.1.20	# 开发板的两个网口分别设置为10和20，哪个能连上就用哪个
+ssh orangepi@192.168.1.10	# 开发板上靠近电源线的网口被设置为192.168.1.10
 ```
 
 ### 手动运行
@@ -48,9 +48,9 @@ ssh orangepi@192.168.1.20	# 开发板的两个网口分别设置为10和20，哪
 系统启动后本程序会自动运行，可以手动运行观察输出。如下命令都是在开发板的系统上执行。
 
 ```
-sudo systemctl stop my-car	# 停止本程序的运行，注意下次重启后本程序依然会自动运行
+sudo systemctl stop chenlong-robot	# 停止本程序的运行，注意下次重启后本程序依然会自动运行
 conda activate rknn			# 切换到本程序的运行环境
-cd ~/Code/Desktop-Wanderer	# 切换到本程序所在的目录
+cd ~/Desktop-Wanderer	# 切换到本程序所在的目录
 python -m src.main			# 手动运行本程序
 ```
 
