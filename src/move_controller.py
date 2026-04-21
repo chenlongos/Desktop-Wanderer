@@ -1,7 +1,21 @@
 from src.lekiwi import DirectionControl
-from .setup import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus
+from .setup import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus, get_fps
 from .utils import get_nearly_target_box
 from src.yolov import Box
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# 摄像头标定参数: D = M / P + C (cm)
+_CAL_M = 2892.91
+_CAL_C = 0.27
+BEST_DISTANCE_CM = 19.0
+DISTANCE_TOLERANCE_CM = 0.2
+CENTER_TOLERANCE_PX = 50
+CENTER_SLOWDOWN_PX = 300
+FRAME_WIDTH = 640
+FRAME_CX = FRAME_WIDTH // 2
 
 target_w = get_target_w()
 target_h = get_target_h()
@@ -17,48 +31,77 @@ TARGET_CY = top + target_h // 2
 TARGET_POSITION = max(target_w, target_h)
 
 _cycle_time = 0
+_stable_count = 0
+_move_frame_count = 0
 
 _last_ball_center_x = None
 
+
+def _estimate_distance(diameter_px: int) -> float:
+    """从bbox像素直径估算距离(cm)"""
+    if diameter_px <= 0:
+        return 999.0
+    return _CAL_M / diameter_px + _CAL_C
+
+
 def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
-    global _cycle_time, _last_ball_center_x
+    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
     if result and len(result) > 0:
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
-        position = max(w, h)
+        diameter_px = max(w, h)
         _last_ball_center_x = center_x
-        if center_x < left: # 如果球位于目标框左侧
-            if abs(TARGET_CX - center_x) < target_w * 1.5: # 球与目标框中点距离小于目标框的1.5倍，慢速前进
-                action = direction.get_action("rotate_left", 1)
+
+        # 第一步：先旋转对准球心（中心 +-10px）
+        offset = center_x - FRAME_CX
+        if abs(offset) > CENTER_TOLERANCE_PX:
+            if offset < 0:
+                if abs(offset) < CENTER_SLOWDOWN_PX:
+                    action = direction.get_action("rotate_left", 0)
+                else:
+                    action = direction.get_action("rotate_left")
             else:
-                action = direction.get_action("rotate_left")
-            _cycle_time = 0
-        elif center_x > right: # 如果球位于目标框右侧
-            if abs(TARGET_CX - center_x) < target_w * 1.5: # 与目标框中点距离小于目标框的1.5倍，慢速前进
-                action = direction.get_action("rotate_right", 1)
-            else:
-                action = direction.get_action("rotate_right")
-            _cycle_time = 0
-        elif position < (TARGET_POSITION - 10): # 如果球在摄像头中的直径小于，目标框-8的2倍 ，则前进（可调）
-            if position * 0.8 > TARGET_POSITION:
-                action = direction.get_action("forward", 0)
-            else:
-                action = direction.get_action("forward", 3)
-            _cycle_time = 0
-        elif position > (TARGET_POSITION + 10): # 如果球在摄像头中的直径大于，目标框+10的2倍 ，则后退（可调）
-            action = direction.get_action("backward", 1)
-            _cycle_time = 0
-        else:
+                if abs(offset) < CENTER_SLOWDOWN_PX:
+                    action = direction.get_action("rotate_right", 0)
+                else:
+                    action = direction.get_action("rotate_right")
+            _stable_count = 0
+            return action
+
+        # 第二步：球已居中，根据距离前进/后退
+        distance_cm = _estimate_distance(diameter_px)
+        error_cm = distance_cm - BEST_DISTANCE_CM
+
+        if abs(error_cm) <= DISTANCE_TOLERANCE_CM:
+            # 距离合适，稳定计数
+            if _move_frame_count > 0:
+                logger.info(f"stopped after {_move_frame_count} move frames")
+                _move_frame_count = 0
             action = direction.get_action(None)
-            _cycle_time += 1
-            if _cycle_time > 10: # 10帧稳定存在，则进入下一流程
+            _stable_count += 1
+            if _stable_count > 10:
                 set_robot_status(RobotStatus.PICK)
-                _cycle_time = 0
+                _stable_count = 0
+        else:
+            _stable_count = 0
+            _move_frame_count += 1
+            # 速度 = (距离误差cm / 100) / 帧时间 * 0.8 → m/s
+            frame_time = 1.0 / get_fps()
+            if error_cm > 6:
+                factor = 0.9
+            else:
+                factor = 0.1
+            speed_mps = (error_cm / 100.0) / frame_time * 0.1
+            # 限幅到合理范围
+            action = direction.get_action(None)
+            action["x.vel"] = speed_mps
+            dir_str = "forward" if speed_mps > 0 else "backward"
+            logger.info(f"{dir_str}: dist={distance_cm:.1f}cm err={error_cm:.1f}cm vel={speed_mps:.3f}m/s frame#{_move_frame_count}")
     else:
+        _stable_count = 0
         if _last_ball_center_x is not None:
-            frame_center = (left + right) // 2
-            if _last_ball_center_x < frame_center:
+            if _last_ball_center_x < FRAME_CX:
                 action = direction.get_action("rotate_left")
             else:
                 action = direction.get_action("rotate_right")
