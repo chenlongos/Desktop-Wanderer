@@ -6,9 +6,10 @@ from src.arm_inverse_controller import p_control_loop, return_to_start_position
 from src.move_controller import move_controller, get_empty_move_action, move_controller_for_bucket
 from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
-    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_hardware_mode, get_fps
+    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_fps
 from src.utils import busy_wait
 from src.yolov import yolo_infer, get_black_bucket_local, get_red_bucket_local
+from src.stream_server import start_stream_server, update_frame, is_running, is_quit
 
 sys.path.append(os.path.dirname(__file__))
 import time
@@ -50,6 +51,7 @@ def main():
     robot = get_robot()
     direction = get_direction()
     robot.connect()
+    start_stream_server()
 
     print("Reading initial joint angles...")
     start_obs = robot.get_observation()
@@ -67,12 +69,29 @@ def main():
     x0, y0 = 0.0989, 0.125 # 当前位置的xy坐标
     current_x, current_y = x0, y0
     command_step = 0
+
+    # 通过网页按钮控制：按住运行，松开停止
+    print("Open the control panel in your browser to start.")
+    was_running = False
     try:
-        while True:
+        while not is_quit():
             t0 = time.perf_counter()
 
+            # 始终读取摄像头并推流
             current_obs = robot.get_observation()
             frame = current_obs["front"]
+
+            if not is_running():
+                # 未按下按钮时，只推流不执行动作
+                if was_running:
+                    robot.send_action(get_empty_move_action(direction))
+                    was_running = False
+                update_frame(frame)
+                busy_wait(max(1.0 / get_fps() - (time.perf_counter() - t0), 0.0))
+                continue
+
+            was_running = True
+
             if get_robot_status() == RobotStatus.FIND_BUCKET:
                 gripper_pos = current_obs.get('arm_gripper.pos', 5)
                 is_gripper_holding = gripper_pos > 25
@@ -88,21 +107,18 @@ def main():
             elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 
-            if get_hardware_mode() == 'normal': # 摄像头视角显示，
-                for box in result:
-                    x, y, w, h = box.x, box.y, box.w, box.h
-                    center_x = x + w // 2
-                    center_y = y + h // 2
-                    pt1, pt2 = (x, y), (x + w, y + h)
-                    cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
-                    cv2.rectangle(frame, (get_left(), get_top()), (get_right(), get_bottom()), color=(255, 255, 0),
-                                  thickness=2)
-                    cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
+            # 摄像头视角显示，通过MJPEG流
+            for box in result:
+                x, y, w, h = box.x, box.y, box.w, box.h
+                center_x = x + w // 2
+                center_y = y + h // 2
+                pt1, pt2 = (x, y), (x + w, y + h)
+                cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
+                cv2.rectangle(frame, (get_left(), get_top()), (get_right(), get_bottom()), color=(255, 255, 0),
+                                thickness=2)
+                cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
 
-                cv2.imshow("frame", frame)
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord('q'):
-                    break
+            update_frame(frame)
 
             arm_action = {}
             move_action = get_empty_move_action(direction)
@@ -149,7 +165,7 @@ def main():
             elif get_robot_status() == RobotStatus.FIND_BUCKET:
                 move_action = move_controller_for_bucket(direction, result)
 
-            _action_sent = robot.send_action({**arm_action, **move_action})
+            robot.send_action({**arm_action, **move_action})
             if get_robot_status() != RobotStatus.PICK:
                 busy_wait(max(1.0 / get_fps() - (time.perf_counter() - t0), 0.0))
     finally:
