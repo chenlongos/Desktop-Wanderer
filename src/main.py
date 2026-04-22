@@ -63,7 +63,7 @@ def main():
     for joint_name, position in start_positions.items():
         print(f"  {joint_name}: {position}°")
 
-    return_to_start_position(robot, start_obs, get_target_positions(), 0.9, get_fps()) # 机械臂回到预设位置
+    return_to_start_position(robot, start_obs, get_target_positions(), 0.2, get_fps())  # 机械臂回到预设位置
     x0, y0 = 0.0989, 0.125 # 当前位置的xy坐标
     current_x, current_y = x0, y0
     command_step = 0
