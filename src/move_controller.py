@@ -10,7 +10,7 @@ logger.setLevel(logging.INFO)
 # 摄像头标定参数: D = M / P + C (cm)
 _CAL_M = 2892.91
 _CAL_C = 0.27
-BEST_DISTANCE_CM = 19.0
+BEST_DISTANCE_CM = 18.8
 DISTANCE_TOLERANCE_CM = 0.2
 CENTER_FIND_TOLERANCE_PX = 50
 CENTER_SLOWDOWN_PX = 300
@@ -35,6 +35,7 @@ TARGET_POSITION = max(target_w, target_h)
 _cycle_time = 0
 _stable_count = 0
 _move_frame_count = 0
+_search_rotate_deg = 0.0  # 累计搜索旋转角度
 
 _last_ball_center_x = None
 
@@ -47,7 +48,7 @@ def _estimate_distance(diameter_px: int) -> float:
 
 
 def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
-    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
+    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count, _search_rotate_deg
     if result and len(result) > 0:
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
@@ -72,6 +73,7 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         error_cm = distance_cm - BEST_DISTANCE_CM
 
         if abs(error_cm) <= DISTANCE_TOLERANCE_CM:
+            _search_rotate_deg = 0.0  # 找到球了，重置搜索旋转计数
             offset = center_x - GRAB_GOAL_CX
             if abs(offset) > CENTER_GRAB_TOLERANCE_PX:
                 if offset < 0:
@@ -109,11 +111,25 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             logger.info(f"{dir_str}: dist={distance_cm:.1f}cm err={error_cm:.1f}cm vel={speed_mps:.3f}m/s frame#{_move_frame_count}")
     else:
         _stable_count = 0
+        # 每帧累计旋转角度（默认速度档位2 = 50 deg/s）
+        frame_time = 1.0 / get_fps()
+        if _search_rotate_deg < 360:
+            speed_level = 2
+            deg_per_frame = 100 * frame_time
+        elif _search_rotate_deg < 720:
+            speed_level = 1
+            deg_per_frame = 60 * frame_time
+        else:
+            speed_level = 0
+            deg_per_frame = 30 * frame_time
+        _search_rotate_deg += deg_per_frame
+        logger.info(f"Searched degrees: {_search_rotate_deg}")
+
         if _last_ball_center_x is not None:
             if _last_ball_center_x < FIND_GOAL_CX:
-                action = direction.get_action("rotate_left")
+                action = direction.get_action("rotate_left", speed_level)
             else:
-                action = direction.get_action("rotate_right")
+                action = direction.get_action("rotate_right", speed_level)
         else:
             action = direction.get_action(None)
     return action
