@@ -59,15 +59,11 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         offset = center_x - FIND_GOAL_CX
         if abs(offset) > CENTER_FIND_TOLERANCE_PX:
             if offset < 0:
-                if abs(offset) < CENTER_SLOWDOWN_PX:
-                    action = direction.get_action("rotate_left", 0)
-                else:
-                    action = direction.get_action("rotate_left")
+                action = direction.get_action(None)
+                action['theta.vel'] = 15
             else:
-                if abs(offset) < CENTER_SLOWDOWN_PX:
-                    action = direction.get_action("rotate_right", 0)
-                else:
-                    action = direction.get_action("rotate_right")
+                action = direction.get_action(None)
+                action['theta.vel'] = -15
             _stable_count = 0
             return action
 
@@ -83,7 +79,7 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
                     action['theta.vel'] = 5
                 else:
                     action = direction.get_action(None)
-                    action['theta.vel'] = 5
+                    action['theta.vel'] = -5
                 _stable_count = 0
                 return action
             
