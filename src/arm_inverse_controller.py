@@ -185,8 +185,7 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
         return {}, current_x, current_y
 
 
-def return_to_start_position(robot, current_obs, start_positions, kp=0.5, control_freq=50,
-                            startup_kp=None, startup_steps=20):
+def return_to_start_position(robot, current_obs, start_positions, kp=0.5, control_freq=50):
     """
     Use P control to return to start position
 
@@ -196,26 +195,14 @@ def return_to_start_position(robot, current_obs, start_positions, kp=0.5, contro
         start_positions: start joint position dictionary
         kp: proportional gain
         control_freq: control frequency (Hz)
-        startup_kp: initial kp at startup (default: 20% of kp)
-        startup_steps: number of steps for ramp-up (default: 20 steps @ 50Hz = 0.4s)
     """
-    if startup_kp is None:
-        startup_kp = kp * 0.2  # 启动增益为正常值的20%
-
-    print(f"Returning to start position... (kp={kp}, startup_kp={startup_kp:.2f}, startup_steps={startup_steps})")
+    print("Returning to start position...")
 
     control_period = 1.0 / control_freq
     max_steps = int(5.0 * control_freq)  # Maximum 5 seconds
 
     for step in range(max_steps):
-        # 计算当前增益：启动阶段线性增加
-        if step < startup_steps:
-            current_kp = startup_kp + (kp - startup_kp) * (step / startup_steps)
-        else:
-            current_kp = kp
-
-        # Get current robot state (每次循环都获取最新状态)
-        current_obs = robot.get_observation()
+        # Get current robot state
         current_positions = {}
         for key, value in current_obs.items():
             if key.endswith('.pos'):
@@ -231,8 +218,8 @@ def return_to_start_position(robot, current_obs, start_positions, kp=0.5, contro
                 error = target_pos - current_pos
                 total_error += abs(error)
 
-                # P control: output = Kp * error (使用动态增益)
-                control_output = current_kp * error
+                # P control: output = Kp * error
+                control_output = kp * error
 
                 # Convert control output to position command
                 new_position = current_pos + control_output
