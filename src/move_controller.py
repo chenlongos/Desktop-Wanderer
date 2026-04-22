@@ -12,10 +12,12 @@ _CAL_M = 2892.91
 _CAL_C = 0.27
 BEST_DISTANCE_CM = 19.0
 DISTANCE_TOLERANCE_CM = 0.2
-CENTER_TOLERANCE_PX = 50
+CENTER_FIND_TOLERANCE_PX = 50
 CENTER_SLOWDOWN_PX = 300
+CENTER_GRAB_TOLERANCE_PX = 10
 FRAME_WIDTH = 640
-FRAME_CX = FRAME_WIDTH // 2
+FIND_GOAL_CX = FRAME_WIDTH // 2
+GRAB_GOAL_CX = FRAME_WIDTH // 2 + 10
 
 target_w = get_target_w()
 target_h = get_target_h()
@@ -54,8 +56,8 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         _last_ball_center_x = center_x
 
         # 第一步：先旋转对准球心（中心 +-10px）
-        offset = center_x - FRAME_CX
-        if abs(offset) > CENTER_TOLERANCE_PX:
+        offset = center_x - FIND_GOAL_CX
+        if abs(offset) > CENTER_FIND_TOLERANCE_PX:
             if offset < 0:
                 if abs(offset) < CENTER_SLOWDOWN_PX:
                     action = direction.get_action("rotate_left", 0)
@@ -74,6 +76,17 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         error_cm = distance_cm - BEST_DISTANCE_CM
 
         if abs(error_cm) <= DISTANCE_TOLERANCE_CM:
+            offset = center_x - GRAB_GOAL_CX
+            if abs(offset) > CENTER_GRAB_TOLERANCE_PX:
+                if offset < 0:
+                    action = direction.get_action(None)
+                    action['theta.vel'] = 5
+                else:
+                    action = direction.get_action(None)
+                    action['theta.vel'] = 5
+                _stable_count = 0
+                return action
+            
             # 距离合适，稳定计数
             if _move_frame_count > 0:
                 logger.info(f"stopped after {_move_frame_count} move frames")
@@ -101,7 +114,7 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
     else:
         _stable_count = 0
         if _last_ball_center_x is not None:
-            if _last_ball_center_x < FRAME_CX:
+            if _last_ball_center_x < FIND_GOAL_CX:
                 action = direction.get_action("rotate_left")
             else:
                 action = direction.get_action("rotate_right")

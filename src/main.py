@@ -1,10 +1,11 @@
+from operator import contains
 import os
 import sys
 
 from src.arm_act_controller import arm_controller
 from src.arm_inverse_controller import p_control_loop, return_to_start_position
-from src.move_controller import move_controller, get_empty_move_action, move_controller_for_bucket, \
-    CENTER_TOLERANCE_PX, CENTER_SLOWDOWN_PX, FRAME_CX
+from src.move_controller import CENTER_GRAB_TOLERANCE_PX, GRAB_GOAL_CX, move_controller, get_empty_move_action, move_controller_for_bucket, \
+    CENTER_FIND_TOLERANCE_PX, CENTER_SLOWDOWN_PX, FIND_GOAL_CX
 from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_fps
@@ -116,11 +117,14 @@ def main():
                 pt1, pt2 = (x, y), (x + w, y + h)
                 cv2.rectangle(frame, pt1, pt2, (0, 255, 0), 2)
                 # CENTER_TOLERANCE_PX 线（绿色，内侧）
-                cv2.line(frame, (FRAME_CX - CENTER_TOLERANCE_PX, 0), (FRAME_CX - CENTER_TOLERANCE_PX, 480), (0, 255, 0), 1)
-                cv2.line(frame, (FRAME_CX + CENTER_TOLERANCE_PX, 0), (FRAME_CX + CENTER_TOLERANCE_PX, 480), (0, 255, 0), 1)
+                cv2.line(frame, (FIND_GOAL_CX - CENTER_FIND_TOLERANCE_PX, 0), (FIND_GOAL_CX - CENTER_FIND_TOLERANCE_PX, 480), (0, 255, 0), 1)
+                cv2.line(frame, (FIND_GOAL_CX + CENTER_FIND_TOLERANCE_PX, 0), (FIND_GOAL_CX + CENTER_FIND_TOLERANCE_PX, 480), (0, 255, 0), 1)
                 # CENTER_SLOWDOWN_PX 线（黄色，外侧）
-                cv2.line(frame, (FRAME_CX - CENTER_SLOWDOWN_PX, 0), (FRAME_CX - CENTER_SLOWDOWN_PX, 480), (0, 255, 255), 1)
-                cv2.line(frame, (FRAME_CX + CENTER_SLOWDOWN_PX, 0), (FRAME_CX + CENTER_SLOWDOWN_PX, 480), (0, 255, 255), 1)
+                cv2.line(frame, (FIND_GOAL_CX - CENTER_SLOWDOWN_PX, 0), (FIND_GOAL_CX - CENTER_SLOWDOWN_PX, 480), (0, 255, 255), 1)
+                cv2.line(frame, (FIND_GOAL_CX + CENTER_SLOWDOWN_PX, 0), (FIND_GOAL_CX + CENTER_SLOWDOWN_PX, 480), (0, 255, 255), 1)
+
+                cv2.line(frame, (GRAB_GOAL_CX - CENTER_GRAB_TOLERANCE_PX, 0), (GRAB_GOAL_CX - CENTER_GRAB_TOLERANCE_PX, 480), (255, 0, 255), 1)
+                cv2.line(frame, (GRAB_GOAL_CX + CENTER_GRAB_TOLERANCE_PX, 0), (GRAB_GOAL_CX + CENTER_GRAB_TOLERANCE_PX, 480), (255, 0, 255), 1)
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
                 diameter_px = max(w, h)
                 distance_cm = 2892.91 / diameter_px + 0.27
