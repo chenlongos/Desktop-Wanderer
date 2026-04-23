@@ -40,6 +40,7 @@ _search_circles = 0       # 完成了几圈搜索
 _search_pause_counter = 0 # 当前暂停帧计数
 
 _last_ball_center_x = None
+_last_bucket_center_x = None
 
 
 def _estimate_distance(diameter_px: int) -> float:
@@ -153,14 +154,14 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             action = direction.get_action(None)
     return action
 
-def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
-    global _cycle_time, _last_ball_center_x
+def move_controller_for_bucket(direction: DirectionControl, result: list[Box], change_status: bool = True) -> dict[str, float]:
+    global _cycle_time, _last_bucket_center_x
     if result and len(result) > 0:
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
         position = min(w, h)
-        _last_ball_center_x = center_x
+        _last_bucket_center_x = center_x
         if center_x < left: # 如果桶位于目标框左侧
             if abs(TARGET_CX - center_x) < target_w:
                 action = direction.get_action("rotate_left")
@@ -185,18 +186,19 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box]) -
         else:
             action = direction.get_action(None)
             _cycle_time += 1
-            if _cycle_time > 10: # 10帧稳定存在，则进入下一流程
-                set_robot_status(RobotStatus.PUT_BALL)
-                _cycle_time = 0
+            if change_status:
+                if _cycle_time > 10: # 10帧稳定存在，则进入下一流程
+                    set_robot_status(RobotStatus.PUT_BALL)
+                    _cycle_time = 0
     else:
-        if _last_ball_center_x is not None:
+        if _last_bucket_center_x is not None:
             frame_center = (left + right) // 2
-            if _last_ball_center_x < frame_center:
+            if _last_bucket_center_x < frame_center:
                 action = direction.get_action("rotate_left")
             else:
                 action = direction.get_action("rotate_right")
         else:
-            action = direction.get_action(None)
+            action = direction.get_action("rotate_left")
     return action
 
 def get_empty_move_action(direction: DirectionControl):
