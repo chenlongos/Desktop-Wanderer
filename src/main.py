@@ -26,8 +26,8 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 CATCH_ACTION = [
                 [
                     # ("move_to", (0.0989, 0.125)),
-                    ("shoulder_pan", -12), # 对应1号舵机
-                    ("gripper", 60), # 夹爪打开
+                    ("shoulder_pan_abs", -12), # 对应1号舵机
+                    ("gripper_abs", 70), # 夹爪打开
                     ("wrist_flex", 95),  # 腕部舵机转动角度q
                     # ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
                     ("move_to", (0.140, -0.065)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
@@ -168,7 +168,7 @@ def main():
                             command_step += 1
                     else:
                         command_step += 1
-
+                        
                     if command_step == len(CATCH_ACTION):
                         set_robot_status(RobotStatus.FIND_BUCKET)
                         command_step = 0
