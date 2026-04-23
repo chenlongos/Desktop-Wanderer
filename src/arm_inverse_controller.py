@@ -56,17 +56,35 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
     delta_x = 0.0
     delta_y = 0.0
 
-    try:
-        cmd_name = cmd[0]
-        if cmd_name == "gap":
-            sleep(0.3)
+    # 支持单条命令或命令列表
+    if isinstance(cmd[0], str):
+        cmds = [cmd]
+    else:
+        cmds = cmd
 
-        # ---------------------------------------------------------
-        # 修改部分：实现分段与自适应移动 (X, Y 坐标控制)
-        # ---------------------------------------------------------
-        if cmd_name == 'move_to':
-            target_x = cmd[1][0]
-            target_y = cmd[1][1]
+    try:
+        for c in cmds:
+            cmd_name = c[0]
+            if cmd_name == "gap":
+                sleep(0.3)
+            elif cmd_name == 'move_to':
+                move_command_list.append(c)
+            elif cmd_name.endswith('_abs'):
+                # 绝对位置命令: ("shoulder_pan_abs", -12) → 直接设置目标
+                base_name = cmd_name[:-4]  # 去掉 _abs
+                if base_name in joint_controls:
+                    joint_name = joint_controls[base_name]
+                    target_positions[joint_name] = c[1]
+            elif cmd_name in joint_controls:
+                joint_command_list.append(c)
+            else:
+                wrist_command_list.append(c)
+
+        # 处理 move_to（取最后一个作为目标）
+        if move_command_list:
+            last_move = move_command_list[-1]
+            target_x = last_move[1][0]
+            target_y = last_move[1][1]
 
             # 1. 计算当前与目标的误差矢量
             error_x = target_x - current_x
@@ -107,17 +125,9 @@ def p_control_loop(cmd, current_x, current_y, current_obs, kp=0.5):
             # 更新当前坐标
             current_x += delta_x
             current_y += delta_y
-
+            
             # Debug 日志 (可选，用于调试参数)
             # logging.debug(f"Dist: {distance:.4f}, Step: {step_size:.4f}, CurX: {current_x:.3f}, CurY: {current_y:.3f}")
-
-        # ---------------------------------------------------------
-        # 处理关节直接控制命令
-        # ---------------------------------------------------------
-        elif cmd_name in joint_controls:
-            joint_command_list.append(cmd)
-        else:
-            wrist_command_list.append(cmd)
 
         # Pitch control
         if len(wrist_command_list) > 0:
