@@ -10,14 +10,14 @@ logger.setLevel(logging.INFO)
 # 摄像头标定参数: D = M / P + C (cm)
 _CAL_M = 2892.91
 _CAL_C = 0.27
-BEST_DISTANCE_CM = 18.8
-DISTANCE_TOLERANCE_CM = 0.2
+BEST_DISTANCE_CM = 15
+DISTANCE_TOLERANCE_CM = 0.5
 CENTER_FIND_TOLERANCE_PX = 50
 CENTER_SLOWDOWN_PX = 300
 CENTER_GRAB_TOLERANCE_PX = 10
 FRAME_WIDTH = 640
 FIND_GOAL_CX = FRAME_WIDTH // 2
-GRAB_GOAL_CX = FRAME_WIDTH // 2 + 10
+GRAB_GOAL_CX = FRAME_WIDTH // 2 + 20
 
 target_w = get_target_w()
 target_h = get_target_h()
@@ -36,6 +36,8 @@ _cycle_time = 0
 _stable_count = 0
 _move_frame_count = 0
 _search_rotate_deg = 0.0  # 累计搜索旋转角度
+_search_circles = 0       # 完成了几圈搜索
+_search_pause_counter = 0 # 当前暂停帧计数
 
 _last_ball_center_x = None
 
@@ -48,7 +50,7 @@ def _estimate_distance(diameter_px: int) -> float:
 
 
 def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
-    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count, _search_rotate_deg
+    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count, _search_rotate_deg, _search_circles, _search_pause_counter
     if result and len(result) > 0:
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
@@ -73,7 +75,9 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         error_cm = distance_cm - BEST_DISTANCE_CM
 
         if abs(error_cm) <= DISTANCE_TOLERANCE_CM:
-            _search_rotate_deg = 0.0  # 找到球了，重置搜索旋转计数
+            _search_rotate_deg = 0.0
+            _search_circles = 0
+            _search_pause_counter = 0
             offset = center_x - GRAB_GOAL_CX
             if abs(offset) > CENTER_GRAB_TOLERANCE_PX:
                 if offset < 0:
@@ -99,11 +103,11 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             _move_frame_count += 1
             # 速度 = (距离误差cm / 100) / 帧时间 * 0.8 → m/s
             frame_time = 1.0 / get_fps()
-            if error_cm > 6:
+            if error_cm > 10:
                 factor = 0.9
             else:
-                factor = 0.1
-            speed_mps = (error_cm / 100.0) / frame_time * 0.1
+                factor = 0.05
+            speed_mps = (error_cm / 100.0) / frame_time * factor
             # 限幅到合理范围
             action = direction.get_action(None)
             action["x.vel"] = speed_mps
@@ -111,19 +115,34 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             logger.info(f"{dir_str}: dist={distance_cm:.1f}cm err={error_cm:.1f}cm vel={speed_mps:.3f}m/s frame#{_move_frame_count}")
     else:
         _stable_count = 0
-        # 每帧累计旋转角度（默认速度档位2 = 50 deg/s）
         frame_time = 1.0 / get_fps()
-        if _search_rotate_deg < 360:
+
+        # 检查是否完成了一圈（360°）
+        circle_threshold = (_search_circles + 1) * 360
+        if _search_rotate_deg >= circle_threshold:
+            _search_circles += 1
+            _search_pause_counter = 0
+            logger.info(f"Completed circle #{_search_circles}, will pause {_search_circles} frame(s) between moves")
+
+        # 第一圈正常速度，之后每多一圈，每次移动后暂停更多帧
+        if _search_circles == 0:
             speed_level = 2
             deg_per_frame = 100 * frame_time
-        elif _search_rotate_deg < 720:
+        elif _search_circles == 1:
             speed_level = 1
             deg_per_frame = 60 * frame_time
         else:
+            # 暂停逻辑：每 _search_circles 帧才动一帧
+            _search_pause_counter += 1
+            if _search_pause_counter <= _search_circles - 2:
+                # 暂停帧，不动
+                return direction.get_action(None)
+            _search_pause_counter = 0
             speed_level = 0
             deg_per_frame = 30 * frame_time
+
         _search_rotate_deg += deg_per_frame
-        logger.info(f"Searched degrees: {_search_rotate_deg}")
+        logger.info(f"Searched degrees: {_search_rotate_deg:.0f}, circle: {_search_circles}")
 
         if _last_ball_center_x is not None:
             if _last_ball_center_x < FIND_GOAL_CX:

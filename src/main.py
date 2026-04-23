@@ -27,9 +27,9 @@ CATCH_ACTION = [
                 ("move_to", (0.0989, 0.125)),
                 ("shoulder_pan", -12), # 对应1号舵机
                 ("gripper", 60), # 夹爪打开
-                ("wrist_flex", 80),  # 腕部舵机转动角度q
+                ("wrist_flex", 95),  # 腕部舵机转动角度q
                 ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                ("move_to", (0.140, -0.05)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                ("move_to", (0.140, -0.065)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ("gap", 0), # 停顿指令
                 ("gripper", -60), # 夹爪关闭
                 ("gap", 0), # 停顿指令
@@ -43,8 +43,7 @@ PUT_ACTION = [
     ("gap", 0),  # 停顿指令
     ("gripper", 60),
     ("gap", 0), # 停顿指令
-    ("move_to", (-0.1, 0.2)), # 回收
-    ("gripper", -60), # 夹爪关闭
+    [("gripper_abs", 10), ("move_to", (-0.1, 0.2))],
 ]
 
 def main():
@@ -83,7 +82,9 @@ def main():
             current_obs = robot.get_observation()
             frame = current_obs["front"]
 
-            if not is_running():
+            # no_move = not is_running()
+            no_move = False
+            if no_move:
                 # 未按下按钮时，只推流不执行动作
                 if was_running:
                     robot.send_action(get_empty_move_action(direction))
@@ -143,18 +144,30 @@ def main():
                     arm_action, current_x, current_y = p_control_loop(CATCH_ACTION[command_step],
                                                                       current_x,
                                                                       current_y, current_obs, kp=0.8)
-                    if CATCH_ACTION[command_step][0] == "move_to":
-                        if abs(current_x - CATCH_ACTION[command_step][1][0]) < 0.002 and abs(
-                                current_y - CATCH_ACTION[command_step][1][1]) < 0.002:
+                    step = CATCH_ACTION[command_step]
+                    # 判断当前步骤是否完成
+                    has_move_to = False
+                    if isinstance(step, list):
+                        # 列表命令：检查最后一个 move_to 是否到达
+                        for c in step:
+                            if c[0] == "move_to":
+                                has_move_to = True
+                                move_target = c[1]
+                        if has_move_to:
+                            if abs(current_x - move_target[0]) < 0.002 and abs(current_y - move_target[1]) < 0.002:
+                                command_step += 1
+                        else:
                             command_step += 1
-                            if command_step == len(CATCH_ACTION):
-                                set_robot_status(RobotStatus.FIND_BUCKET)
-                                command_step = 0
+                    elif step[0] == "move_to":
+                        has_move_to = True
+                        if abs(current_x - step[1][0]) < 0.002 and abs(current_y - step[1][1]) < 0.002:
+                            command_step += 1
                     else:
                         command_step += 1
-                        if command_step == len(CATCH_ACTION):
-                            set_robot_status(RobotStatus.FIND_BUCKET)
-                            command_step = 0
+
+                    if command_step == len(CATCH_ACTION):
+                        set_robot_status(RobotStatus.FIND_BUCKET)
+                        command_step = 0
             elif get_robot_status() == RobotStatus.PUT_BALL:
                 arm_action, current_x, current_y = p_control_loop(PUT_ACTION[command_step],
                                                                   current_x,
