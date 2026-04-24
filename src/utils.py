@@ -4,25 +4,23 @@ import time
 from .yolov import Box
 
 from .setup import get_left, get_target_w
+from .move_controller import FRAME_WIDTH
 
 target_w = get_target_w()
 
 left = get_left()
 
 TARGET_CX = left + target_w // 2
+HALF_WIDTH = FRAME_WIDTH / 2
 
 def get_nearly_target_box(result: list[Box]) -> Box:
-    box = result[0]
-    if len(result) > 1:
-        x, y, w, h = box.x, box.y, box.w, box.h
-        center_x = x + w // 2
-        area = w * h - (abs(TARGET_CX - center_x) * h) * 0.5
-        for other_box in result[1:]:
-            x, y, w, h = other_box.x, other_box.y, other_box.w, other_box.h
-            center_x = x + w // 2
-            if area < w * h - (abs(TARGET_CX - center_x) * h) * 0.5:
-                box = other_box
-    return box
+    # Score = area, with a bonus for being near center (up to +50% for dead center)
+    def _score(b: Box) -> float:
+        area = b.w * b.h
+        cx = b.x + b.w / 2
+        center_ratio = 1.0 - abs(cx - HALF_WIDTH) / HALF_WIDTH  # 1.0 at center, 0.0 at edge
+        return area * (1.0 + 0.5 * center_ratio)
+    return max(result, key=_score)
 
 
 def busy_wait(seconds):
