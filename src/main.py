@@ -30,7 +30,7 @@ CATCH_ACTION = [
                     ("gripper_abs", 70), # 夹爪打开
                     ("wrist_flex", 95),  # 腕部舵机转动角度q
                     # ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                    ("move_to", (0.140, -0.065)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                    ("move_to", (0.140, -0.060)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ],
                 ("gap", 0), # 停顿指令
                 ("gripper", -60), # 夹爪关闭
@@ -191,7 +191,7 @@ def main():
                         reset_robot()
                         command_step = 0
             elif get_robot_status() == RobotStatus.SEARCH:
-                move_action = move_controller(direction, result)
+                move_action = move_controller(direction, result, frame)
             elif get_robot_status() == RobotStatus.FIND_BUCKET:
                 move_action = move_controller_for_bucket(direction, result)
 
