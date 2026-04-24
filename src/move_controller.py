@@ -3,11 +3,16 @@ from .setup import get_left, get_bottom, get_right, get_top, get_target_w, get_t
 from .utils import get_nearly_target_box
 from src.yolov import Box
 import logging
+import time
+import cv2
+import numpy as np
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# 摄像头标定参数: D = M / P + C (cm)
+# --- Named constants ---
+
+# Camera calibration: D = M / P + C (cm)
 _CAL_M = 2892.91
 _CAL_C = 0.27
 BEST_DISTANCE_CM = 15
@@ -18,6 +23,22 @@ CENTER_GRAB_TOLERANCE_PX = 10
 FRAME_WIDTH = 640
 FIND_GOAL_CX = FRAME_WIDTH // 2
 GRAB_GOAL_CX = FRAME_WIDTH // 2 + 20
+
+# Ball-recently-lost: charge forward duration (seconds)
+BALL_LOST_CHARGE_DURATION_S = 2.0
+# HSV heatmap: target HSV and cylindrical distance parameters
+HSV_TARGET_HUE = 40
+HSV_TARGET_SAT = 125
+HSV_TARGET_VAL = 219
+HSV_SIMILARITY_THRESHOLD = 0.7
+HSV_SIGMA = 93
+HSV_BLUR_KERNEL = 9
+# Blob: center-x must be within this many px of frame center to charge
+BLOB_CENTER_TOLERANCE_PX = 100
+# Charge-toward-blob duration (seconds)
+BLOB_CHARGE_DURATION_S = 2.0
+# Search rotation: degrees per full circle
+FULL_CIRCLE_DEG = 360
 
 target_w = get_target_w()
 target_h = get_target_h()
@@ -37,10 +58,16 @@ _stable_count = 0
 _move_frame_count = 0
 _search_rotate_deg = 0.0  # 累计搜索旋转角度
 _search_circles = 0       # 完成了几圈搜索
-_search_pause_counter = 0 # 当前暂停帧计数
 
 _last_ball_center_x = None
 _last_bucket_center_x = None
+_last_ball_seen_time = 0.0  # monotonic timestamp of last ball detection
+
+# HSV blob search state
+_last_pass_max_blob = 0        # max blob size from the previous completed circle
+_current_pass_max_blob = 0     # max blob size being recorded during current circle
+_blob_charge_start_time = 0.0  # when we started charging toward a blob
+_blob_charging = False          # currently in blob-charge mode
 
 
 def _estimate_distance(diameter_px: int) -> float:
@@ -50,9 +77,79 @@ def _estimate_distance(diameter_px: int) -> float:
     return _CAL_M / diameter_px + _CAL_C
 
 
-def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str, float]:
-    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count, _search_rotate_deg, _search_circles, _search_pause_counter
+def _hsv_blob_analysis(frame) -> tuple[int, float]:
+    """Compute the largest 4-connected LIKELY blob and its average x coordinate.
+
+    Uses cylindrical HSV distance: H+S mapped to Cartesian (x,y), V as z.
+    Returns (max_blob_size, avg_x).  avg_x is -1 if no blob found.
+    """
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    hue = hsv[:, :, 0].astype(np.float32)
+    sat = hsv[:, :, 1].astype(np.float32)
+    val = hsv[:, :, 2].astype(np.float32)
+
+    # Cylindrical HSV → Cartesian distance
+    hue_rad = hue * (np.pi / 90.0)
+    target_rad = HSV_TARGET_HUE * (np.pi / 90.0)
+
+    dx = sat * np.cos(hue_rad) - HSV_TARGET_SAT * np.cos(target_rad)
+    dy = sat * np.sin(hue_rad) - HSV_TARGET_SAT * np.sin(target_rad)
+    dz = val - HSV_TARGET_VAL
+
+    dist = np.sqrt(dx * dx + dy * dy + dz * dz)
+    similarity = np.exp(-0.5 * (dist / HSV_SIGMA) ** 2)
+
+    # Spatial blur to reduce noise
+    sim_u8 = (similarity * 255).astype(np.uint8)
+    sim_u8 = cv2.GaussianBlur(sim_u8, (HSV_BLUR_KERNEL, HSV_BLUR_KERNEL), 0)
+    similarity = sim_u8.astype(np.float32) / 255.0
+
+    # Threshold: >= 0.9 → LIKELY (1), else 0
+    mask = (similarity >= HSV_SIMILARITY_THRESHOLD).astype(np.uint8)
+
+    # 4-connected component analysis
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=4)
+
+    max_size = 0
+    max_avg_x = -1.0
+    for i in range(1, num_labels):
+        area = stats[i, cv2.CC_STAT_AREA]
+        if area > max_size:
+            max_size = area
+            max_avg_x = centroids[i][0]
+
+    return max_size, max_avg_x
+
+
+def move_controller(direction: DirectionControl, result: list[Box], frame=None) -> dict[str, float]:
+    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
+    global _search_rotate_deg, _search_circles
+    global _last_ball_seen_time, _last_pass_max_blob, _current_pass_max_blob, _blob_charge_start_time, _blob_charging
+
+    now = time.monotonic()
+
+    # If we're in blob-charge mode, keep going forward unless a ball appears or time's up
+    if _blob_charging:
+        if result and len(result) > 0:
+            # Ball found during charge — stop charging, fall through to normal tracking
+            _blob_charging = False
+            logger.info("Ball detected during blob charge, switching to tracking")
+        elif now - _blob_charge_start_time < BLOB_CHARGE_DURATION_S:
+            action = direction.get_action("forward", 3)
+            logger.info("Blob charge: driving forward")
+            return action
+        else:
+            # Charge time expired — reset and continue spinning for another 360°
+            _blob_charging = False
+            _search_rotate_deg = 0.0
+            _search_circles = 0
+            _last_pass_max_blob = 0
+            _current_pass_max_blob = 0
+            logger.info("Blob charge expired, resuming search")
+            return direction.get_action(None)
+
     if result and len(result) > 0:
+        _last_ball_seen_time = now
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
@@ -78,7 +175,8 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
         if abs(error_cm) <= DISTANCE_TOLERANCE_CM:
             _search_rotate_deg = 0.0
             _search_circles = 0
-            _search_pause_counter = 0
+            _last_pass_max_blob = 0
+            _current_pass_max_blob = 0
             offset = center_x - GRAB_GOAL_CX
             if abs(offset) > CENTER_GRAB_TOLERANCE_PX:
                 if offset < 0:
@@ -115,35 +213,52 @@ def move_controller(direction: DirectionControl, result: list[Box]) -> dict[str,
             dir_str = "forward" if speed_mps > 0 else "backward"
             logger.info(f"{dir_str}: dist={distance_cm:.1f}cm err={error_cm:.1f}cm vel={speed_mps:.3f}m/s frame#{_move_frame_count}")
     else:
+        # Ball just disappeared — if seen less than threshold ago, charge forward
+        if now - _last_ball_seen_time < BALL_LOST_CHARGE_DURATION_S:
+            action = direction.get_action("forward", 2)
+            logger.info("Ball lost recently, charging forward")
+            return action
+
         _stable_count = 0
         frame_time = 1.0 / get_fps()
 
-        # 检查是否完成了一圈（360°）
-        circle_threshold = (_search_circles + 1) * 360
+        # --- HSV blob analysis during search ---
+        blob_size = 0
+        blob_avg_x = -1.0
+        if frame is not None:
+            blob_size, blob_avg_x = _hsv_blob_analysis(frame)
+
+        # Check if we completed a full circle
+        circle_threshold = (_search_circles + 1) * FULL_CIRCLE_DEG
         if _search_rotate_deg >= circle_threshold:
             _search_circles += 1
-            _search_pause_counter = 0
-            logger.info(f"Completed circle #{_search_circles}, will pause {_search_circles} frame(s) between moves")
+            # Promote current pass max to last pass max for next circle
+            _last_pass_max_blob = _current_pass_max_blob
+            _current_pass_max_blob = 0
+            logger.info(f"Completed circle #{_search_circles}, last pass max blob: {_last_pass_max_blob}")
 
-        # 第一圈正常速度，之后每多一圈，每次移动后暂停更多帧
-        if _search_circles == 0:
-            speed_level = 2
-            deg_per_frame = 100 * frame_time
-        elif _search_circles == 1:
-            speed_level = 1
-            deg_per_frame = 60 * frame_time
-        else:
-            # 暂停逻辑：每 _search_circles 帧才动一帧
-            _search_pause_counter += 1
-            if _search_pause_counter <= _search_circles - 2:
-                # 暂停帧，不动
-                return direction.get_action(None)
-            _search_pause_counter = 0
-            speed_level = 0
-            deg_per_frame = 30 * frame_time
+        # Always record the max blob of the current pass
+        if blob_size > _current_pass_max_blob:
+            _current_pass_max_blob = blob_size
+
+        # From circle 1 onward: charge if blob is at least 90% of last pass's max
+        if (_search_circles >= 1
+                and _last_pass_max_blob > 0
+                and blob_size >= 0.85 * _last_pass_max_blob
+                and blob_avg_x >= 0):
+            offset_from_center = abs(blob_avg_x - FIND_GOAL_CX)
+            if offset_from_center <= BLOB_CENTER_TOLERANCE_PX:
+                _blob_charging = True
+                _blob_charge_start_time = now
+                action = direction.get_action("forward", 2)
+                logger.info(f"Blob charge triggered (circle {_search_circles}): size={blob_size} >= 90% of last_max={_last_pass_max_blob} avg_x={blob_avg_x:.0f}")
+                return action
+
+        speed_level = 2
+        deg_per_frame = 90 * frame_time
 
         _search_rotate_deg += deg_per_frame
-        logger.info(f"Searched degrees: {_search_rotate_deg:.0f}, circle: {_search_circles}")
+        logger.info(f"Searched degrees: {_search_rotate_deg:.0f}, circle: {_search_circles}, blob: {blob_size}")
 
         if _last_ball_center_x is not None:
             if _last_ball_center_x < FIND_GOAL_CX:
