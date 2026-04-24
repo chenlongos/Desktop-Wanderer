@@ -153,7 +153,7 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
-        diameter_px = max(w, h)
+        diameter_px = min(w, h)
         _last_ball_center_x = center_x
 
         # 第一步：先旋转对准球心（中心 +-10px）
@@ -266,7 +266,7 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
             else:
                 action = direction.get_action("rotate_right", speed_level)
         else:
-            action = direction.get_action(None)
+            action = direction.get_action("rotate_left", speed=2)
     return action
 
 def move_controller_for_bucket(direction: DirectionControl, result: list[Box], change_status: bool = True) -> dict[str, float]:
