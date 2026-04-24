@@ -1,6 +1,7 @@
 from src.lekiwi import DirectionControl
 from .setup import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus, get_fps
 from .utils import get_nearly_target_box
+from .led_controller import set_state as set_led, BALL_FOUND, SEARCH_A, SEARCH_B
 from src.yolov import Box
 import logging
 import time
@@ -149,6 +150,7 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
             return direction.get_action(None)
 
     if result and len(result) > 0:
+        set_led(BALL_FOUND)
         _last_ball_seen_time = now
         box = get_nearly_target_box(result)
         x, y, w, h = box.x, box.y, box.w, box.h
@@ -237,6 +239,8 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
             _current_pass_max_blob = 0
             logger.info(f"Completed circle #{_search_circles}, last pass max blob: {_last_pass_max_blob}")
 
+        set_led(SEARCH_A if _search_circles % 2 == 0 else SEARCH_B)
+        
         # Always record the max blob of the current pass
         if blob_size > _current_pass_max_blob:
             _current_pass_max_blob = blob_size
@@ -255,7 +259,7 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
                 return action
 
         speed_level = 2
-        deg_per_frame = 90 * frame_time
+        deg_per_frame = 125 * frame_time
 
         _search_rotate_deg += deg_per_frame
         logger.info(f"Searched degrees: {_search_rotate_deg:.0f}, circle: {_search_circles}, blob: {blob_size}")

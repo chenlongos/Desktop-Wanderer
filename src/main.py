@@ -12,6 +12,7 @@ from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_lo
 from src.utils import busy_wait
 from src.yolov import yolo_infer, get_black_bucket_local, get_red_bucket_local
 from src.stream_server import start_stream_server, update_frame, is_running, is_quit
+from src import led_controller
 
 sys.path.append(os.path.dirname(__file__))
 import time
@@ -56,6 +57,7 @@ def main():
     robot = get_robot()
     direction = get_direction()
     robot.connect()
+    led_controller.init()
     start_stream_server()
 
     print("Reading initial joint angles...")
