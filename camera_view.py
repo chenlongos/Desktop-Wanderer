@@ -28,8 +28,10 @@ CAL_C = 0.27
 # --- Tunable heatmap parameters (thread-safe) ---
 _params_lock = threading.Lock()
 _hue_target = 40       # H value the heatmap peaks at (0-180)
+_sat_target = 200      # S value (0-255)
+_val_target = 200      # V value (0-255)
 _blur_radius = 9       # GaussianBlur kernel size (odd, >=1)
-_temporal_alpha = 0.6  # EMA weight for current frame (0.0-1.0)
+_hue_sigma = 80.0      # Gaussian sigma for cylindrical HSV distance
 
 # --- Minimal MJPEG stream server ---
 _latest_frame = None
@@ -51,17 +53,25 @@ _PAGE = b"""\
 </style></head>
 <body>
 <div class="controls">
-  <label>Hue target
+  <label>Hue
     <input type="range" id="hue" min="0" max="180" value="40">
     <span class="val" id="hueV">40</span>
   </label>
-  <label>Blur radius
+  <label>Sat
+    <input type="range" id="sat" min="0" max="255" value="200">
+    <span class="val" id="satV">200</span>
+  </label>
+  <label>Val
+    <input type="range" id="val" min="0" max="255" value="200">
+    <span class="val" id="valV">200</span>
+  </label>
+  <label>Blur
     <input type="range" id="blur" min="1" max="31" step="2" value="9">
     <span class="val" id="blurV">9</span>
   </label>
-  <label>Temporal &alpha;
-    <input type="range" id="alpha" min="0" max="100" value="60">
-    <span class="val" id="alphaV">0.60</span>
+  <label>Sigma
+    <input type="range" id="sigma" min="1" max="120" value="80">
+    <span class="val" id="sigmaV">80</span>
   </label>
 </div>
 <img src="/stream">
@@ -69,12 +79,15 @@ _PAGE = b"""\
 function send(k,v){fetch('/api/params?'+k+'='+v)}
 document.getElementById('hue').oninput=function(){
   document.getElementById('hueV').textContent=this.value;send('hue',this.value)};
+document.getElementById('sat').oninput=function(){
+  document.getElementById('satV').textContent=this.value;send('sat',this.value)};
+document.getElementById('val').oninput=function(){
+  document.getElementById('valV').textContent=this.value;send('val',this.value)};
 document.getElementById('blur').oninput=function(){
   var v=this.value%2===0?+this.value+1:+this.value;this.value=v;
   document.getElementById('blurV').textContent=v;send('blur',v)};
-document.getElementById('alpha').oninput=function(){
-  var v=(this.value/100).toFixed(2);
-  document.getElementById('alphaV').textContent=v;send('alpha',v)};
+document.getElementById('sigma').oninput=function(){
+  document.getElementById('sigmaV').textContent=this.value;send('sigma',this.value)};
 </script>
 </body>
 </html>
@@ -82,7 +95,7 @@ document.getElementById('alpha').oninput=function(){
 
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        global _hue_target, _blur_radius, _temporal_alpha
+        global _hue_target, _sat_target, _val_target, _blur_radius, _hue_sigma
         if self.path == '/stream':
             self.send_response(200)
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
@@ -104,11 +117,15 @@ class _Handler(BaseHTTPRequestHandler):
             with _params_lock:
                 if 'hue' in qs:
                     _hue_target = max(0, min(180, int(qs['hue'][0])))
+                if 'sat' in qs:
+                    _sat_target = max(0, min(255, int(qs['sat'][0])))
+                if 'val' in qs:
+                    _val_target = max(0, min(255, int(qs['val'][0])))
                 if 'blur' in qs:
                     v = max(1, min(31, int(qs['blur'][0])))
                     _blur_radius = v if v % 2 == 1 else v + 1
-                if 'alpha' in qs:
-                    _temporal_alpha = max(0.0, min(1.0, float(qs['alpha'][0])))
+                if 'sigma' in qs:
+                    _hue_sigma = max(1.0, min(120.0, float(qs['sigma'][0])))
             self.send_response(204)
             self.end_headers()
         else:
@@ -139,7 +156,6 @@ def main():
     _start_server()
 
     fps = get_fps()
-    prev_heat = None  # temporal smoothing buffer for heatmap
     print("Streaming camera with tennis ball detection. Ctrl+C to stop.")
 
     try:
@@ -148,6 +164,38 @@ def main():
 
             obs = robot.get_observation()
             frame = obs["front"]
+
+            # --- Cylindrical HSV distance heatmap (computed on clean frame) ---
+            with _params_lock:
+                target_hue = _hue_target
+                target_sat = _sat_target
+                target_val = _val_target
+                blur_k = _blur_radius
+                sigma = _hue_sigma
+
+            hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            hue = hsv_frame[:, :, 0].astype(np.float32)   # 0-180
+            sat = hsv_frame[:, :, 1].astype(np.float32)   # 0-255
+            val = hsv_frame[:, :, 2].astype(np.float32)   # 0-255
+
+            # Convert H+S to Cartesian on the color wheel, V as z-axis
+            hue_rad = hue * (np.pi / 90.0)          # 0-180 → 0-2π
+            target_rad = target_hue * (np.pi / 90.0)
+
+            dx = sat * np.cos(hue_rad) - target_sat * np.cos(target_rad)
+            dy = sat * np.sin(hue_rad) - target_sat * np.sin(target_rad)
+            dz = val - target_val
+
+            dist = np.sqrt(dx * dx + dy * dy + dz * dz)
+
+            # Gaussian similarity from distance
+            similarity = np.exp(-0.5 * (dist / sigma) ** 2)
+            heat = (similarity * 255).astype(np.uint8)
+
+            # Spatial blur to suppress per-pixel noise
+            heat = cv2.GaussianBlur(heat, (blur_k, blur_k), 0)
+
+            heatmap = cv2.applyColorMap(heat, cv2.COLORMAP_JET)
 
             # Detect tennis balls
             detections = yolo_infer(frame)
@@ -200,37 +248,6 @@ def main():
             cv2.putText(frame, f"H:{hsv_pixel[0]} S:{hsv_pixel[1]} V:{hsv_pixel[2]}",
                         (mid_x + cross_len + 35, mid_y + 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-
-            # --- Hue-proximity heatmap (tunable via browser sliders) ---
-            with _params_lock:
-                target_hue = _hue_target
-                blur_k = _blur_radius
-                alpha = _temporal_alpha
-
-            hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            hue = hsv_frame[:, :, 0].astype(np.float32)  # 0-180
-            sat = hsv_frame[:, :, 1].astype(np.float32)  # 0-255
-
-            # Gaussian weight: sigma=12 gives a smooth falloff (~±24 hue units)
-            hue_sigma = 12.0
-            hue_diff = np.minimum(np.abs(hue - target_hue), 180 - np.abs(hue - target_hue))  # wrap-aware
-            hue_weight = np.exp(-0.5 * (hue_diff / hue_sigma) ** 2)
-
-            # Suppress low-saturation pixels (grays/whites aren't really "that hue")
-            sat_gate = np.clip(sat / 80.0, 0, 1)
-            heat = (hue_weight * sat_gate * 255).astype(np.uint8)
-
-            # Spatial blur to suppress per-pixel hue noise shimmer
-            heat = cv2.GaussianBlur(heat, (blur_k, blur_k), 0)
-
-            # Temporal smoothing: EMA blend with previous frame
-            heat_f = heat.astype(np.float32)
-            if prev_heat is not None:
-                heat_f = alpha * heat_f + (1.0 - alpha) * prev_heat
-            prev_heat = heat_f
-            heat = np.clip(heat_f, 0, 255).astype(np.uint8)
-
-            heatmap = cv2.applyColorMap(heat, cv2.COLORMAP_JET)
 
             # Stack original frame and heatmap side-by-side
             combined = np.hstack((frame, heatmap))
