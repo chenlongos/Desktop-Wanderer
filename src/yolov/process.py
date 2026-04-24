@@ -77,7 +77,7 @@ def yolo_infer(frame):
     scores = pred[:, 4:]
     class_ids = np.argmax(scores, axis=1)
     conf_scores = scores[np.arange(len(scores)), class_ids]
-    mask = conf_scores > 0.70
+    mask = conf_scores > 0.50
 
     pred = pred[mask]
     conf_scores = conf_scores[mask]
