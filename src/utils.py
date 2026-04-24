@@ -4,13 +4,13 @@ import time
 from .yolov import Box
 
 from .setup import get_left, get_target_w
-from .move_controller import FRAME_WIDTH
 
 target_w = get_target_w()
 
 left = get_left()
 
 TARGET_CX = left + target_w // 2
+FRAME_WIDTH = 640
 HALF_WIDTH = FRAME_WIDTH / 2
 
 def get_nearly_target_box(result: list[Box]) -> Box:
