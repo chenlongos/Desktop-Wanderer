@@ -1,3 +1,4 @@
+import math
 from src.lekiwi import DirectionControl
 from .setup import get_left, get_bottom, get_right, get_top, get_target_w, get_target_h, set_robot_status, RobotStatus, get_fps
 from .utils import get_nearly_target_box
@@ -16,21 +17,21 @@ logger.setLevel(logging.INFO)
 # Camera calibration: D = M / P + C (cm)
 _CAL_M = 2892.91
 _CAL_C = 0.27
-BEST_DISTANCE_CM = 15
+BEST_DISTANCE_CM = 15.2
 DISTANCE_TOLERANCE_CM = 0.5
 CENTER_FIND_TOLERANCE_PX = 50
 CENTER_SLOWDOWN_PX = 300
 CENTER_GRAB_TOLERANCE_PX = 10
 FRAME_WIDTH = 640
 FIND_GOAL_CX = FRAME_WIDTH // 2
-GRAB_GOAL_CX = FRAME_WIDTH // 2 + 20
+GRAB_GOAL_CX = FRAME_WIDTH // 2 + 24
 
 # Ball-recently-lost: charge forward duration (seconds)
 BALL_LOST_CHARGE_DURATION_S = 2.0
 # HSV heatmap: target HSV and cylindrical distance parameters
-HSV_TARGET_HUE = 40
-HSV_TARGET_SAT = 125
-HSV_TARGET_VAL = 219
+HSV_TARGET_HUE = 31
+HSV_TARGET_SAT = 129
+HSV_TARGET_VAL = 255
 HSV_SIMILARITY_THRESHOLD = 0.7
 HSV_SIGMA = 93
 HSV_BLUR_KERNEL = 9
@@ -62,6 +63,9 @@ _search_circles = 0       # 完成了几圈搜索
 
 _last_ball_center_x = None
 _last_bucket_center_x = None
+_last_chosen_ball_box: Box | None = None
+_last_chosen_bucket_box: Box | None = None
+_last_hsv_blob_box: Box | None = None
 _last_ball_seen_time = 0.0  # monotonic timestamp of last ball detection
 
 # HSV blob search state
@@ -78,11 +82,10 @@ def _estimate_distance(diameter_px: int) -> float:
     return _CAL_M / diameter_px + _CAL_C
 
 
-def _hsv_blob_analysis(frame) -> tuple[int, float]:
-    """Compute the largest 4-connected LIKELY blob and its average x coordinate.
+def _hsv_mask(frame):
+    """Compute the HSV similarity mask and connected-component stats.
 
-    Uses cylindrical HSV distance: H+S mapped to Cartesian (x,y), V as z.
-    Returns (max_blob_size, avg_x).  avg_x is -1 if no blob found.
+    Returns (num_labels, stats, centroids) from connectedComponentsWithStats.
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     hue = hsv[:, :, 0].astype(np.float32)
@@ -105,11 +108,21 @@ def _hsv_blob_analysis(frame) -> tuple[int, float]:
     sim_u8 = cv2.GaussianBlur(sim_u8, (HSV_BLUR_KERNEL, HSV_BLUR_KERNEL), 0)
     similarity = sim_u8.astype(np.float32) / 255.0
 
-    # Threshold: >= 0.9 → LIKELY (1), else 0
+    # Threshold
     mask = (similarity >= HSV_SIMILARITY_THRESHOLD).astype(np.uint8)
 
     # 4-connected component analysis
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=4)
+    num_labels, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask, connectivity=4)
+    return num_labels, stats, centroids
+
+
+def _hsv_blob_analysis(frame) -> tuple[int, float]:
+    """Compute the largest 4-connected LIKELY blob and its average x coordinate.
+
+    Uses cylindrical HSV distance: H+S mapped to Cartesian (x,y), V as z.
+    Returns (max_blob_size, avg_x).  avg_x is -1 if no blob found.
+    """
+    num_labels, stats, centroids = _hsv_mask(frame)
 
     max_size = 0
     max_avg_x = -1.0
@@ -122,10 +135,75 @@ def _hsv_blob_analysis(frame) -> tuple[int, float]:
     return max_size, max_avg_x
 
 
+# Minimum blob area (pixels) to be considered a valid HSV fallback target
+HSV_FALLBACK_MIN_BLOB_AREA = 200
+# Distance threshold: if nearest YOLO box is farther than this, prefer HSV blob
+HSV_FALLBACK_DISTANCE_CM = 40.0
+
+
+HSV_BLOB_STICKINESS_WEIGHT = 10
+HSV_BLOB_STICKINESS_RADIUS = 300  # px distance where bonus decays to 0
+
+
+def _hsv_largest_blob_box(frame) -> Box | None:
+    """Return a Box for the highest-scoring HSV-matching blob, or None if too small.
+
+    Score = area * (1 + stickiness_bonus), where the bonus favours blobs
+    close to the previously chosen HSV blob.
+    """
+    global _last_hsv_blob_box
+
+    num_labels, stats, _centroids = _hsv_mask(frame)
+
+    best_idx = -1
+    best_score = -1e9
+    for i in range(1, num_labels):
+        area = stats[i, cv2.CC_STAT_AREA]
+        if area < HSV_FALLBACK_MIN_BLOB_AREA:
+            continue
+
+        score = float(area)
+
+        if _last_hsv_blob_box is not None:
+            bx = int(stats[i, cv2.CC_STAT_LEFT])
+            by = int(stats[i, cv2.CC_STAT_TOP])
+            bw = int(stats[i, cv2.CC_STAT_WIDTH])
+            bh = int(stats[i, cv2.CC_STAT_HEIGHT])
+            cx = bx + bw / 2
+            cy = by + bh / 2
+            prev_cx = _last_hsv_blob_box.x + _last_hsv_blob_box.w / 2
+            prev_cy = _last_hsv_blob_box.y + _last_hsv_blob_box.h / 2
+            dist = ((cx - prev_cx) ** 2 + (cy - prev_cy) ** 2) ** 0.5
+            proximity = max(0.0, 1.0 - dist / HSV_BLOB_STICKINESS_RADIUS)
+            score *= (1.0 + HSV_BLOB_STICKINESS_WEIGHT * proximity)
+
+        if score > best_score:
+            best_score = score
+            best_idx = i
+
+    if best_idx < 0:
+        return None
+
+    bx = int(stats[best_idx, cv2.CC_STAT_LEFT])
+    by = int(stats[best_idx, cv2.CC_STAT_TOP])
+    bw = int(stats[best_idx, cv2.CC_STAT_WIDTH])
+    bh = int(stats[best_idx, cv2.CC_STAT_HEIGHT])
+    result_box = Box(bx, by, bw, bh)
+    if _last_hsv_blob_box is None:
+        _last_hsv_blob_box = result_box
+    else:
+        _last_hsv_blob_box.x = math.floor(_last_hsv_blob_box.x * 0.99 + result_box.x * 0.01)
+        _last_hsv_blob_box.y = math.floor(_last_hsv_blob_box.y * 0.99 + result_box.y * 0.01)
+        _last_hsv_blob_box.w = math.floor(_last_hsv_blob_box.w * 0.99 + result_box.w * 0.01)
+        _last_hsv_blob_box.h = math.floor(_last_hsv_blob_box.h * 0.99 + result_box.h * 0.01)
+    return result_box
+
+
 def move_controller(direction: DirectionControl, result: list[Box], frame=None) -> dict[str, float]:
     global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
     global _search_rotate_deg, _search_circles
     global _last_ball_seen_time, _last_pass_max_blob, _current_pass_max_blob, _blob_charge_start_time, _blob_charging
+    global _last_chosen_ball_box
 
     now = time.monotonic()
 
@@ -152,14 +230,43 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
     if result and len(result) > 0:
         set_led(BALL_FOUND)
         _last_ball_seen_time = now
-        box = get_nearly_target_box(result)
+        box = get_nearly_target_box(result, _last_chosen_ball_box)
+        if _last_chosen_ball_box is None:
+            _last_chosen_ball_box = box
+        else:
+            _last_chosen_ball_box.x = math.floor(_last_chosen_ball_box.x * 0.99 + box.x * 0.01)
+            _last_chosen_ball_box.y = math.floor(_last_chosen_ball_box.y * 0.99 + box.y * 0.01)
+            _last_chosen_ball_box.w = math.floor(_last_chosen_ball_box.w * 0.99 + box.w * 0.01)
+            _last_chosen_ball_box.h = math.floor(_last_chosen_ball_box.h * 0.99 + box.h * 0.01)
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
         diameter_px = min(w, h)
         _last_ball_center_x = center_x
 
+        # If the best YOLO box is too far away, try HSV blob as a closer target
+        distance_cm = _estimate_distance(diameter_px)
+        if distance_cm > HSV_FALLBACK_DISTANCE_CM and frame is not None:
+            hsv_box = _hsv_largest_blob_box(frame)
+            if hsv_box is not None:
+                logger.info(f"YOLO box too far ({distance_cm:.0f}cm), using HSV blob fallback")
+                box = hsv_box
+                x, y, w, h = box.x, box.y, box.w, box.h
+                center_x = x + w // 2
+                diameter_px = min(w, h)
+                _last_ball_center_x = center_x
+                distance_cm = _estimate_distance(diameter_px)
+
         # 第一步：先旋转对准球心（中心 +-10px）
         offset = center_x - FIND_GOAL_CX
+        if abs(offset) > 200:
+            if offset < 0:
+                action = direction.get_action(None)
+                action['theta.vel'] = 45
+            else:
+                action = direction.get_action(None)
+                action['theta.vel'] = -45
+            _stable_count = 0
+            return action
         if abs(offset) > CENTER_FIND_TOLERANCE_PX:
             if offset < 0:
                 action = direction.get_action(None)
@@ -224,6 +331,28 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
         _stable_count = 0
         frame_time = 1.0 / get_fps()
 
+        # # --- HSV fallback: if no YOLO box, use largest HSV blob as target ---
+        # if frame is not None:
+        #     hsv_box = _hsv_largest_blob_box(frame)
+        #     if hsv_box is not None:
+        #         logger.info(f"No YOLO detection, using HSV blob fallback: x={hsv_box.x} w={hsv_box.w}")
+        #         center_x = hsv_box.x + hsv_box.w // 2
+        #         _last_ball_center_x = center_x
+        #         offset = center_x - FIND_GOAL_CX
+        #         if abs(offset) > CENTER_FIND_TOLERANCE_PX:
+        #             if offset < 0:
+        #                 action = direction.get_action(None)
+        #                 action['theta.vel'] = 15
+        #             else:
+        #                 action = direction.get_action(None)
+        #                 action['theta.vel'] = -15
+        #             return action
+        #         else:
+        #             # Blob is centered — drive toward it
+        #             action = direction.get_action("forward", 2)
+        #             logger.info("HSV blob centered, driving forward")
+        #             return action
+
         # --- HSV blob analysis during search ---
         blob_size = 0
         blob_avg_x = -1.0
@@ -274,9 +403,10 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
     return action
 
 def move_controller_for_bucket(direction: DirectionControl, result: list[Box], change_status: bool = True) -> dict[str, float]:
-    global _cycle_time, _last_bucket_center_x
+    global _cycle_time, _last_bucket_center_x, _last_chosen_bucket_box
     if result and len(result) > 0:
-        box = get_nearly_target_box(result)
+        box = get_nearly_target_box(result, _last_chosen_bucket_box)
+        _last_chosen_bucket_box = box
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
         position = min(w, h)
@@ -293,7 +423,7 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box], c
             else:
                 action = direction.get_action("rotate_right")
             _cycle_time = 0
-        elif position < TARGET_POSITION * 2.6: # 如果桶在摄像头中的直径小于目标框的2.6倍，则前进
+        elif position < TARGET_POSITION * 2.4: # 如果桶在摄像头中的直径小于目标框的2.6倍，则前进
             if TARGET_POSITION - position < target_h: # 保证快速前进，if可以去掉
                 action = direction.get_action("forward")
             else:
