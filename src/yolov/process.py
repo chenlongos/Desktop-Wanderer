@@ -77,7 +77,7 @@ def yolo_infer(frame):
     scores = pred[:, 4:]
     class_ids = np.argmax(scores, axis=1)
     conf_scores = scores[np.arange(len(scores)), class_ids]
-    mask = conf_scores > 0.70
+    mask = conf_scores > 0.50
 
     pred = pred[mask]
     conf_scores = conf_scores[mask]
@@ -123,14 +123,17 @@ def get_red_bucket_local(frame):
             | cv2.inRange(hsv, lower_red2, upper_red2)
     )
 
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
     boxes = []
-    for cnt in contours:
-        if cv2.contourArea(cnt) > 5000:
-            x, y, w, h = cv2.boundingRect(cnt)
-            box = Box(int(x), int(y), int(w), int(h))
-            boxes.append(box)
+    for i in range(1, num_labels):
+        area = stats[i, cv2.CC_STAT_AREA]
+        if area > 1000:
+            x = int(stats[i, cv2.CC_STAT_LEFT])
+            y = int(stats[i, cv2.CC_STAT_TOP])
+            w = int(stats[i, cv2.CC_STAT_WIDTH])
+            h = int(stats[i, cv2.CC_STAT_HEIGHT])
+            boxes.append(Box(x, y, w, h))
 
     return boxes
 
