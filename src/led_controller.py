@@ -8,7 +8,6 @@ Four states:
 """
 
 import logging
-import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +30,12 @@ _current_state: str | None = None
 
 
 def _write(path: str, value: str) -> None:
+    """Write value to path."""
     try:
-        subprocess.run(
-            ["sudo", "tee", path],
-            input=value, text=True, capture_output=True, check=True,
-        )
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"LED write failed ({path}): {e.stderr.strip()}")
+        with open(path, 'w') as f:
+            f.write(value)
+    except Exception as e:
+        logger.warning(f"LED write failed ({path}): {e}")
 
 
 def init() -> None:
