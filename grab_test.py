@@ -142,7 +142,7 @@ def main():
                          (GRAB_GOAL_CX + CENTER_GRAB_TOLERANCE_PX, 480), (255, 0, 255), 1)
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
                 diameter_px = max(w, h)
-                distance_cm = 2892.91 / diameter_px + 0.27
+                distance_cm = 3632.9975 / diameter_px + -1.3094
                 cv2.putText(frame, f"{diameter_px}px {distance_cm:.1f}cm", (x, y - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 

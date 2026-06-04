@@ -15,8 +15,8 @@ logger.setLevel(logging.INFO)
 # --- Named constants ---
 
 # Camera calibration: D = M / P + C (cm)
-_CAL_M = 2892.91
-_CAL_C = 0.27
+_CAL_M = 3632.9975
+_CAL_C = -1.3094
 BEST_DISTANCE_CM = 15.2
 DISTANCE_TOLERANCE_CM = 0.5
 CENTER_FIND_TOLERANCE_PX = 50
@@ -254,7 +254,6 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
                 center_x = x + w // 2
                 diameter_px = min(w, h)
                 _last_ball_center_x = center_x
-                distance_cm = _estimate_distance(diameter_px)
 
         # 第一步：先旋转对准球心（中心 +-10px）
         offset = center_x - FIND_GOAL_CX
@@ -330,28 +329,6 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
 
         _stable_count = 0
         frame_time = 1.0 / get_fps()
-
-        # # --- HSV fallback: if no YOLO box, use largest HSV blob as target ---
-        # if frame is not None:
-        #     hsv_box = _hsv_largest_blob_box(frame)
-        #     if hsv_box is not None:
-        #         logger.info(f"No YOLO detection, using HSV blob fallback: x={hsv_box.x} w={hsv_box.w}")
-        #         center_x = hsv_box.x + hsv_box.w // 2
-        #         _last_ball_center_x = center_x
-        #         offset = center_x - FIND_GOAL_CX
-        #         if abs(offset) > CENTER_FIND_TOLERANCE_PX:
-        #             if offset < 0:
-        #                 action = direction.get_action(None)
-        #                 action['theta.vel'] = 15
-        #             else:
-        #                 action = direction.get_action(None)
-        #                 action['theta.vel'] = -15
-        #             return action
-        #         else:
-        #             # Blob is centered — drive toward it
-        #             action = direction.get_action("forward", 2)
-        #             logger.info("HSV blob centered, driving forward")
-        #             return action
 
         # --- HSV blob analysis during search ---
         blob_size = 0

@@ -31,7 +31,7 @@ CATCH_ACTION = [
                     ("gripper_abs", 70), # 夹爪打开
                     ("wrist_flex", 95),  # 腕部舵机转动角度q
                     # ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                    ("move_to", (0.140, -0.060)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                    ("move_to", (0.120, -0.050)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ],
                 ("gap", 0), # 停顿指令
                 ("gripper", -60), # 夹爪关闭
@@ -110,9 +110,9 @@ def main():
                     reset_robot()
                     continue
 
-                # result = get_black_bucket_local(frame) # 找桶的算法
+                result = get_black_bucket_local(frame) # 找桶的算法
                 # if len(result) == 0:
-                result = get_red_bucket_local(frame)
+                # result = get_red_bucket_local(frame)
             elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 
@@ -134,7 +134,7 @@ def main():
                 cv2.line(frame, (GRAB_GOAL_CX + CENTER_GRAB_TOLERANCE_PX, 0), (GRAB_GOAL_CX + CENTER_GRAB_TOLERANCE_PX, 480), (255, 0, 255), 1)
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
                 diameter_px = max(w, h)
-                distance_cm = 2892.91 / diameter_px + 0.27
+                distance_cm = 3632.9975 / diameter_px + -1.3094
                 cv2.putText(frame, f"{diameter_px}px {distance_cm:.1f}cm", (x, y - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
