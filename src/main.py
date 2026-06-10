@@ -2,7 +2,6 @@ from operator import contains
 import os
 import sys
 
-from src.arm_act_controller import arm_controller
 from src.arm_inverse_controller import p_control_loop, return_to_start_position
 from src.move_controller import CENTER_GRAB_TOLERANCE_PX, GRAB_GOAL_CX, move_controller, get_empty_move_action, move_controller_for_bucket, \
     CENTER_FIND_TOLERANCE_PX, CENTER_SLOWDOWN_PX, FIND_GOAL_CX
@@ -27,7 +26,7 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 CATCH_ACTION = [
                 [
                     # ("move_to", (0.0989, 0.125)),
-                    ("shoulder_pan_abs", -12), # 对应1号舵机
+                    ("shoulder_pan_abs", 0), # 对应1号舵机
                     ("gripper_abs", 70), # 夹爪打开
                     ("wrist_flex", 95),  # 腕部舵机转动角度q
                     # ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
@@ -45,9 +44,11 @@ CATCH_ACTION = [
 
 PUT_ACTION = [
     ("shoulder_lift", 50),
+    ("wrist_roll", 95),
     ("gap", 0),  # 停顿指令
     ("gripper", 60),
     ("gap", 0), # 停顿指令
+    ("wrist_roll", -95),
     [("gripper_abs", 10), ("move_to", (-0.1, 0.2))],
 ]
 
@@ -145,7 +146,7 @@ def main():
 
             if get_robot_status() == RobotStatus.PICK:
                 if get_control_mode() == RobotControlModel.ACT:
-                    arm_action = arm_controller(robot)
+                    pass
                 else:
                     arm_action, current_x, current_y = p_control_loop(CATCH_ACTION[command_step],
                                                                       current_x,

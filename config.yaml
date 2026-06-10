@@ -1,5 +1,5 @@
 port: /dev/ttyACM0
 fps: 20
 log_level: INFO
-hardware_mode: rk3588 # normal,310b,rk3588
+hardware_mode: rk3576 # normal,310b,rk3588， rk3576
 control_mode: inverse # inverse, act
