@@ -291,18 +291,27 @@ def yolo_infer(frame):
 
     return filtered_boxes
 
-def get_red_bucket_local(frame):
+def get_bucket_local(frame, color="red"):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+    if color == "red":
+        lower_red1 = np.array([0, 80, 50])
+        upper_red1 = np.array([10, 255, 255])
+        lower_red2 = np.array([170, 80, 50])
+        upper_red2 = np.array([180, 255, 255])
 
-    lower_red1 = np.array([0, 80, 50])
-    upper_red1 = np.array([10, 255, 255])
-    lower_red2 = np.array([170, 80, 50])
-    upper_red2 = np.array([180, 255, 255])
+        mask = (
+                cv2.inRange(hsv, lower_red1, upper_red1)
+                | cv2.inRange(hsv, lower_red2, upper_red2)
+        )
+    elif color == "blue":
+        lower_blue = np.array([90, 80, 50])
+        upper_blue = np.array([130, 255, 255])
 
-    mask = (
-            cv2.inRange(hsv, lower_red1, upper_red1)
-            | cv2.inRange(hsv, lower_red2, upper_red2)
-    )
+        mask = cv2.inRange(hsv, lower_blue, upper_blue)
+        
+    else:
+        raise ValueError(f"Invalid color: {color}")
 
     num_labels, _labels, stats, _centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
 
