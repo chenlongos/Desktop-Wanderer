@@ -211,31 +211,77 @@ def yolo_infer(frame):
         input_data = input_data / 255.
         outputs = session.run(None, {input_name: input_data})
     elif HARDWARE_MODE == "rk3588" or HARDWARE_MODE == "rk3576":
-        outputs = rknn.inference(inputs=[input_img])
+        outputs = rknn.inference(inputs=[input_img], data_format='nhwc')
 
-    # 后处理（使用DFL解码）
-    boxes, classes, scores = post_process(outputs)
-
-    # 将检测框坐标还原到原始图像
-    result_boxes = []
-    if boxes is not None:
-        for i in range(boxes.shape[0]):
-            x1, y1, x2, y2 = boxes[i]
-
-            # 反归一化到原始图像尺寸
+    # 后处理（根据硬件模式选择不同的后处理方式）
+    if HARDWARE_MODE == "rk3588":
+        # fp16模型输出已经是检测框格式，直接解析
+        pred = outputs[0].squeeze().T  # [C, N] -> [N, C]
+        
+        if pred.ndim != 2 or pred.shape[0] == 0:
+            return []
+        
+        scores = pred[:, 4:]
+        class_ids = np.argmax(scores, axis=1)
+        conf_scores = scores[np.arange(len(scores)), class_ids]
+        mask = conf_scores > OBJ_THRESH
+        
+        pred = pred[mask]
+        conf_scores = conf_scores[mask]
+        
+        raw_boxes = []
+        for p in pred:
+            cx, cy, w, h = p[:4]
+            x1 = cx - 0.5 * w
+            y1 = cy - 0.5 * h
+            x2 = cx + 0.5 * w
+            y2 = cy + 0.5 * h
+            # 反归一化到原始图像尺寸（使用letterbox的参数）
             x1 = (x1 - dw) / r
             y1 = (y1 - dh) / r
             x2 = (x2 - dw) / r
             y2 = (y2 - dh) / r
-
             # 裁剪到图像边界
             x1 = max(0, x1)
             y1 = max(0, y1)
             x2 = min(W, x2)
             y2 = min(H, y2)
-
-            box = Box(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
-            result_boxes.append(box)
+            raw_boxes.append([x1, y1, x2, y2])
+        
+        raw_boxes = np.array(raw_boxes, dtype=np.float32)
+        indices = cv2.dnn.NMSBoxes(raw_boxes.tolist(), conf_scores.tolist(), OBJ_THRESH, NMS_THRESH)
+        
+        result_boxes = []
+        if indices is not None and len(indices) > 0:
+            for idx in indices:
+                i = int(idx) if np.isscalar(idx) else int(idx[0])
+                x1, y1, x2, y2 = raw_boxes[i]
+                box = Box(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
+                result_boxes.append(box)
+    elif HARDWARE_MODE == "rk3576":
+        # int8模型输出是特征图格式，需要DFL解码
+        boxes, classes, scores = post_process(outputs)
+        
+        # 将检测框坐标还原到原始图像
+        result_boxes = []
+        if boxes is not None:
+            for i in range(boxes.shape[0]):
+                x1, y1, x2, y2 = boxes[i]
+                
+                # 反归一化到原始图像尺寸
+                x1 = (x1 - dw) / r
+                y1 = (y1 - dh) / r
+                x2 = (x2 - dw) / r
+                y2 = (y2 - dh) / r
+                
+                # 裁剪到图像边界
+                x1 = max(0, x1)
+                y1 = max(0, y1)
+                x2 = min(W, x2)
+                y2 = min(H, y2)
+                
+                box = Box(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
+                result_boxes.append(box)
 
     # 过滤形状
     filtered_boxes = []

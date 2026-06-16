@@ -104,7 +104,7 @@ def main():
 
             if get_robot_status() == RobotStatus.FIND_BUCKET:
                 gripper_pos = current_obs.get('arm_gripper.pos', 5)
-                is_gripper_holding = gripper_pos > 25
+                is_gripper_holding = gripper_pos > 18
 
                 if not is_gripper_holding:
                     set_robot_status(RobotStatus.SEARCH)
