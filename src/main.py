@@ -9,7 +9,7 @@ from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, g
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_fps
 from src.utils import busy_wait
-from src.yolov import yolo_infer, get_black_bucket_local, get_red_bucket_local
+from src.yolov import yolo_infer, get_black_bucket_local, get_bucket_local
 from src.stream_server import start_stream_server, update_frame, is_running, is_quit
 from src import led_controller
 

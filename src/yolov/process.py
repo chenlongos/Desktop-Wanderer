@@ -214,7 +214,50 @@ def yolo_infer(frame):
         outputs = rknn.inference(inputs=[input_img], data_format='nhwc')
 
     # 后处理（根据硬件模式选择不同的后处理方式）
-    if HARDWARE_MODE == "rk3588":
+    if HARDWARE_MODE == "310b" or HARDWARE_MODE == "normal":
+        # ONNX模型输出已经是检测框格式，直接解析
+        pred = outputs[0].squeeze()
+        
+        if pred.ndim != 2 or pred.shape[0] == 0:
+            return []
+        
+        # yolov8是[C, N], 需要转置为[N, C]
+        pred = pred.T
+        
+        boxes_orig = pred[:, :4]  # [cx, cy, w, h]格式
+        conf_scores = pred[:, 4]
+        mask = conf_scores > OBJ_THRESH
+        
+        pred = pred[mask]
+        boxes_orig = boxes_orig[mask]
+        conf_scores = conf_scores[mask]
+        
+        raw_boxes = []
+        for i in range(len(boxes_orig)):
+            cx, cy, w, h = boxes_orig[i]
+            x1 = (cx - w / 2 - dw) / r
+            y1 = (cy - h / 2 - dh) / r
+            x2 = (cx + w / 2 - dw) / r
+            y2 = (cy + h / 2 - dh) / r
+            
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(W, x2)
+            y2 = min(H, y2)
+            raw_boxes.append([x1, y1, x2, y2])
+        
+        # 应用NMS
+        raw_boxes = np.array(raw_boxes, dtype=np.float32)
+        indices = cv2.dnn.NMSBoxes(raw_boxes.tolist(), conf_scores.tolist(), OBJ_THRESH, NMS_THRESH)
+        
+        result_boxes = []
+        if indices is not None and len(indices) > 0:
+            for idx in indices:
+                i = int(idx) if np.isscalar(idx) else int(idx[0])
+                x1, y1, x2, y2 = raw_boxes[i]
+                box = Box(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
+                result_boxes.append(box)
+    elif HARDWARE_MODE == "rk3588":
         # fp16模型输出已经是检测框格式，直接解析
         pred = outputs[0].squeeze().T  # [C, N] -> [N, C]
         
