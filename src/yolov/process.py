@@ -348,7 +348,7 @@ def get_bucket_local(frame, color="red"):
                 | cv2.inRange(hsv, lower_red2, upper_red2)
         )
     elif color == "blue":
-        lower_blue = np.array([90, 80, 50])
+        lower_blue = np.array([90, 120, 120])
         upper_blue = np.array([130, 255, 255])
 
         mask = cv2.inRange(hsv, lower_blue, upper_blue)

@@ -199,6 +199,22 @@ def _hsv_largest_blob_box(frame) -> Box | None:
     return result_box
 
 
+def reset_search_state():
+    global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
+    global _search_rotate_deg, _search_circles
+    global _last_ball_seen_time, _last_pass_max_blob, _current_pass_max_blob, _blob_charge_start_time, _blob_charging
+    global _last_chosen_ball_box
+    _last_ball_seen_time = 0.0
+    _blob_charging = False
+    _search_rotate_deg = 0.0
+    _search_circles = 0
+    _last_pass_max_blob = 0
+    _current_pass_max_blob = 0
+    _last_chosen_ball_box = None
+    _last_ball_center_x = None
+    _stable_count = 0
+    _move_frame_count = 0
+
 def move_controller(direction: DirectionControl, result: list[Box], frame=None) -> dict[str, float]:
     global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
     global _search_rotate_deg, _search_circles
@@ -207,25 +223,7 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
 
     now = time.monotonic()
 
-    # If we're in blob-charge mode, keep going forward unless a ball appears or time's up
-    if _blob_charging:
-        if result and len(result) > 0:
-            # Ball found during charge — stop charging, fall through to normal tracking
-            _blob_charging = False
-            logger.info("Ball detected during blob charge, switching to tracking")
-        elif now - _blob_charge_start_time < BLOB_CHARGE_DURATION_S:
-            action = direction.get_action("forward", 3)
-            logger.info("Blob charge: driving forward")
-            return action
-        else:
-            # Charge time expired — reset and continue spinning for another 360°
-            _blob_charging = False
-            _search_rotate_deg = 0.0
-            _search_circles = 0
-            _last_pass_max_blob = 0
-            _current_pass_max_blob = 0
-            logger.info("Blob charge expired, resuming search")
-            return direction.get_action(None)
+    _blob_charging = False
 
     if result and len(result) > 0:
         set_led(BALL_FOUND)
@@ -322,12 +320,6 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
             dir_str = "forward" if speed_mps > 0 else "backward"
             logger.info(f"{dir_str}: dist={distance_cm:.1f}cm err={error_cm:.1f}cm vel={speed_mps:.3f}m/s frame#{_move_frame_count}")
     else:
-        # Ball just disappeared — if seen less than threshold ago, charge forward
-        if now - _last_ball_seen_time < BALL_LOST_CHARGE_DURATION_S:
-            action = direction.get_action("forward", 2)
-            logger.info("Ball lost recently, charging forward")
-            return action
-
         _stable_count = 0
         frame_time = 1.0 / get_fps()
 
@@ -373,19 +365,6 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
         # Always record the max blob of the current pass
         if blob_size > _current_pass_max_blob:
             _current_pass_max_blob = blob_size
-
-        # From circle 1 onward: charge if blob is at least 90% of last pass's max
-        if (_search_circles >= 1
-                and _last_pass_max_blob > 0
-                and blob_size >= 0.85 * _last_pass_max_blob
-                and blob_avg_x >= 0):
-            offset_from_center = abs(blob_avg_x - FIND_GOAL_CX)
-            if offset_from_center <= BLOB_CENTER_TOLERANCE_PX:
-                _blob_charging = True
-                _blob_charge_start_time = now
-                action = direction.get_action("forward", 2)
-                logger.info(f"Blob charge triggered (circle {_search_circles}): size={blob_size} >= 90% of last_max={_last_pass_max_blob} avg_x={blob_avg_x:.0f}")
-                return action
 
         speed_level = 2
         deg_per_frame = 125 * frame_time

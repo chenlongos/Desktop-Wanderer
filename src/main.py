@@ -4,7 +4,7 @@ import sys
 
 from src.arm_inverse_controller import p_control_loop, return_to_start_position
 from src.move_controller import CENTER_GRAB_TOLERANCE_PX, GRAB_GOAL_CX, move_controller, get_empty_move_action, move_controller_for_bucket, \
-    CENTER_FIND_TOLERANCE_PX, CENTER_SLOWDOWN_PX, FIND_GOAL_CX
+    CENTER_FIND_TOLERANCE_PX, CENTER_SLOWDOWN_PX, FIND_GOAL_CX, reset_search_state
 from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
     RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_fps
@@ -186,12 +186,14 @@ def main():
                         if command_step == len(PUT_ACTION):
                             set_robot_status(RobotStatus.SEARCH)
                             reset_robot()
+                            reset_search_state()
                             command_step = 0
                 else:
                     command_step += 1
                     if command_step == len(PUT_ACTION):
                         set_robot_status(RobotStatus.SEARCH)
                         reset_robot()
+                        reset_search_state()
                         command_step = 0
             elif get_robot_status() == RobotStatus.SEARCH:
                 move_action = move_controller(direction, result, frame)
