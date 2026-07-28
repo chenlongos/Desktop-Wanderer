@@ -26,14 +26,16 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 CATCH_ACTION = [
                 [
                     # ("move_to", (0.0989, 0.125)),
-                    ("shoulder_pan_abs", -12), # 对应1号舵机
-                    ("gripper_abs", 250), # 夹爪打开
+                    ("shoulder_pan_abs", -9), # 对应1号舵机
+                    ("gripper", 20), # 夹爪打开
                     ("wrist_flex", 95),  # 腕部配合移动
                     # ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
-                    ("move_to", (0.140, -0.060)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
+                    ("move_to", (0.140, -0.030)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ],
                 ("gap", 0), # 停顿指令
-                ("gripper_abs", 80), # 夹爪关闭
+                ("gripper_abs", 5), # 夹爪关闭
+                ("gap", 0), # 停顿指令
+                ("gap", 0), # 停顿指令
                 ("gap", 0), # 停顿指令
                 [
                     ("shoulder_pan_abs", 0), # 1号舵机归位
@@ -46,10 +48,12 @@ PUT_ACTION = [
     ("shoulder_lift", 50),
     # ("wrist_roll", 95),
     ("gap", 0),  # 停顿指令
-    ("gripper_abs", 250),
+    ("gripper", 60),
+    ("gap", 0), # 停顿指令
+    ("gap", 0), # 停顿指令
     ("gap", 0), # 停顿指令
     # ("wrist_roll", -95),
-    [("gripper_abs", 80), ("move_to", (-0.1, 0.2))],
+    [("gripper_abs", 5), ("move_to", (-0.1, 0.2))],
 ]
 
 def main():
@@ -60,6 +64,14 @@ def main():
     robot.connect()
     led_controller.init()
     start_stream_server()
+
+    bucket_photo_dir = os.path.join(os.path.dirname(__file__), "..", "bucket_photos")
+    os.makedirs(bucket_photo_dir, exist_ok=True)
+    _last_bucket_photo_time = 0.0
+    _bucket_photo_count = 0
+    _bucket_log_path = os.path.join(bucket_photo_dir, "bucket_log.csv")
+    with open(_bucket_log_path, "w") as f:
+        f.write("timestamp,photo_file,num_boxes,box_x,box_y,box_w,box_h,center_x,center_y,offset_x,distance_cm,gripper_pos\n")
 
     print("Reading initial joint angles...")
     start_obs = robot.get_observation()
@@ -104,7 +116,7 @@ def main():
 
             if get_robot_status() == RobotStatus.FIND_BUCKET:
                 gripper_pos = current_obs.get('arm_gripper.pos', 5)
-                is_gripper_holding = gripper_pos > 18
+                is_gripper_holding = gripper_pos > 20
 
                 if not is_gripper_holding:
                     set_robot_status(RobotStatus.SEARCH)
@@ -143,6 +155,31 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
             update_frame(frame)
+
+            if get_robot_status() == RobotStatus.FIND_BUCKET:
+                now = time.monotonic()
+                if now - _last_bucket_photo_time >= 0.5:
+                    _last_bucket_photo_time = now
+                    _bucket_photo_count += 1
+                    timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    filename = f"bucket_{timestamp}_{_bucket_photo_count:04d}.jpg"
+                    filepath = os.path.join(bucket_photo_dir, filename)
+                    cv2.imwrite(filepath, frame)
+
+                    gripper_pos = current_obs.get('arm_gripper.pos', 5)
+                    if result and len(result) > 0:
+                        box = result[0]
+                        cx = box.x + box.w // 2
+                        cy = box.y + box.h // 2
+                        diam = max(box.w, box.h)
+                        dist = 2892.91 / diam + 0.27 if diam > 0 else 999.0
+                        offset = cx - 320
+                        log_line = f"{timestamp},{filename},{len(result)},{box.x},{box.y},{box.w},{box.h},{cx},{cy},{offset},{dist:.1f},{gripper_pos}\n"
+                    else:
+                        log_line = f"{timestamp},{filename},0,,,,,,,{gripper_pos}\n"
+                    with open(_bucket_log_path, "a") as f:
+                        f.write(log_line)
+                    print(f"[找桶] 保存照片: {filepath}")
 
             arm_action = {}
             move_action = get_empty_move_action(direction)

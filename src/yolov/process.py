@@ -393,6 +393,13 @@ def yolo_infer_blue_bucket(frame):
                 box = Box(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
                 result_boxes.append(box)
 
+        if len(result_boxes) > 1:
+            min_x = min(b.x for b in result_boxes)
+            min_y = min(b.y for b in result_boxes)
+            max_x = max(b.x + b.w for b in result_boxes)
+            max_y = max(b.y + b.h for b in result_boxes)
+            result_boxes = [Box(min_x, min_y, max_x - min_x, max_y - min_y)]
+
         return result_boxes
     else:
         return get_bucket_local(frame, color="blue")

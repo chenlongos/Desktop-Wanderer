@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 # Camera calibration: D = M / P + C (cm)
 _CAL_M = 2892.91
 _CAL_C = 0.27
-BEST_DISTANCE_CM = 14.7 # 15.2
+BEST_DISTANCE_CM = 13.2 # 15.2
 DISTANCE_TOLERANCE_CM = 0.5
 CENTER_FIND_TOLERANCE_PX = 50
 CENTER_SLOWDOWN_PX = 300
@@ -382,49 +382,42 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
     return action
 
 def move_controller_for_bucket(direction: DirectionControl, result: list[Box], change_status: bool = True) -> dict[str, float]:
-    global _cycle_time, _last_bucket_center_x, _last_chosen_bucket_box
+    global _last_bucket_center_x, _last_chosen_bucket_box
     if result and len(result) > 0:
         box = get_nearly_target_box(result, _last_chosen_bucket_box)
         _last_chosen_bucket_box = box
         x, y, w, h = box.x, box.y, box.w, box.h
         center_x = x + w // 2
-        position = min(w, h)
         _last_bucket_center_x = center_x
-        if center_x < left: # 如果桶位于目标框左侧
-            if abs(TARGET_CX - center_x) < target_w:
-                action = direction.get_action("rotate_left")
+        offset = center_x - FIND_GOAL_CX
+
+        if abs(offset) > CENTER_FIND_TOLERANCE_PX:
+            if offset < 0:
+                action = direction.get_action(None)
+                action['theta.vel'] = 15
             else:
-                action = direction.get_action("rotate_left")
-            _cycle_time = 0
-        elif center_x > right: # 如果桶位于目标框右侧
-            if abs(TARGET_CX - center_x) < target_w:
-                action = direction.get_action("rotate_right")
-            else:
-                action = direction.get_action("rotate_right")
-            _cycle_time = 0
-        elif position < TARGET_POSITION * 2.4: # 如果桶在摄像头中的直径小于目标框的2.6倍，则前进
-            if TARGET_POSITION - position < target_h: # 保证快速前进，if可以去掉
-                action = direction.get_action("forward")
-            else:
-                action = direction.get_action("forward")
-            _cycle_time = 0
-        elif position > TARGET_POSITION * 3: # 如果桶在摄像头中的直径大于目标框的3倍，则后退
-            action = direction.get_action("backward", 1)
-            _cycle_time = 0
-        else:
+                action = direction.get_action(None)
+                action['theta.vel'] = -15
+            return action
+
+        if w > 240 and abs(offset) <= CENTER_FIND_TOLERANCE_PX:
             action = direction.get_action(None)
-            _cycle_time += 1
             if change_status:
-                if _cycle_time > 10: # 10帧稳定存在，则进入下一流程
-                    set_robot_status(RobotStatus.PUT_BALL)
-                    _cycle_time = 0
+                set_robot_status(RobotStatus.PUT_BALL)
+            return action
+
+        action = direction.get_action(None)
+        action["x.vel"] = 0.15
+        return action
     else:
         if _last_bucket_center_x is not None:
             frame_center = (left + right) // 2
             if _last_bucket_center_x < frame_center:
-                action = direction.get_action("rotate_left")
+                action = direction.get_action(None)
+                action['theta.vel'] = 30
             else:
-                action = direction.get_action("rotate_right")
+                action = direction.get_action(None)
+                action['theta.vel'] = -30
         else:
             action = direction.get_action("rotate_left")
     return action
