@@ -7,9 +7,9 @@ from src.move_controller import CENTER_GRAB_TOLERANCE_PX, GRAB_GOAL_CX, move_con
     CENTER_FIND_TOLERANCE_PX, CENTER_SLOWDOWN_PX, FIND_GOAL_CX, reset_search_state
 from src.robot_setup import init_robot, get_robot, get_direction, reset_robot, get_target_positions
 from src.setup import init_app, get_left, get_top, get_right, get_bottom, get_log_level, get_robot_status, \
-    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_fps
+    RobotStatus, get_control_mode, RobotControlModel, set_robot_status, get_fps, get_hardware_mode
 from src.utils import busy_wait
-from src.yolov import yolo_infer, get_black_bucket_local, get_bucket_local
+from src.yolov import yolo_infer, get_black_bucket_local, get_bucket_local, yolo_infer_blue_bucket
 from src.stream_server import start_stream_server, update_frame, is_running, is_quit
 from src import led_controller
 
@@ -26,14 +26,14 @@ logging.basicConfig(level=getattr(logging, get_log_level()))
 CATCH_ACTION = [
                 [
                     # ("move_to", (0.0989, 0.125)),
-                    ("shoulder_pan_abs", 0), # 对应1号舵机
-                    ("gripper_abs", 70), # 夹爪打开
-                    ("wrist_flex", 95),  # 腕部舵机转动角度q
+                    ("shoulder_pan_abs", -12), # 对应1号舵机
+                    ("gripper_abs", 250), # 夹爪打开
+                    ("wrist_flex", 95),  # 腕部配合移动
                     # ("move_to", (0.140, 0.1211)), # 机械臂坐标移动指令，x移动到范围为 0.22 - -0.22
                     ("move_to", (0.140, -0.060)), # 机械臂移动到球的位置， y移动范围为 0.22 - -0.15
                 ],
                 ("gap", 0), # 停顿指令
-                ("gripper", -60), # 夹爪关闭
+                ("gripper_abs", 80), # 夹爪关闭
                 ("gap", 0), # 停顿指令
                 [
                     ("shoulder_pan_abs", 0), # 1号舵机归位
@@ -44,12 +44,12 @@ CATCH_ACTION = [
 
 PUT_ACTION = [
     ("shoulder_lift", 50),
-    ("wrist_roll", 95),
+    # ("wrist_roll", 95),
     ("gap", 0),  # 停顿指令
-    ("gripper", 60),
+    ("gripper_abs", 250),
     ("gap", 0), # 停顿指令
-    ("wrist_roll", -95),
-    [("gripper_abs", 10), ("move_to", (-0.1, 0.2))],
+    # ("wrist_roll", -95),
+    [("gripper_abs", 80), ("move_to", (-0.1, 0.2))],
 ]
 
 def main():
@@ -113,7 +113,10 @@ def main():
 
                 # result = get_black_bucket_local(frame) # 找桶的算法
                 # if len(result) == 0:
-                result = get_bucket_local(frame, color="blue")
+                if get_hardware_mode() == "rk3588":
+                    result = yolo_infer_blue_bucket(frame)
+                else:
+                    result = get_bucket_local(frame, color="blue")
             elif get_robot_status() == RobotStatus.SEARCH:
                 result = yolo_infer(frame) # 找球的算法
 

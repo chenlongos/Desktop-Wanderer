@@ -17,7 +17,7 @@ logger.setLevel(logging.INFO)
 # Camera calibration: D = M / P + C (cm)
 _CAL_M = 2892.91
 _CAL_C = 0.27
-BEST_DISTANCE_CM = 18.4 # 15.2
+BEST_DISTANCE_CM = 14.7 # 15.2
 DISTANCE_TOLERANCE_CM = 0.5
 CENTER_FIND_TOLERANCE_PX = 50
 CENTER_SLOWDOWN_PX = 300

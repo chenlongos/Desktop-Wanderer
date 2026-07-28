@@ -36,6 +36,11 @@ elif HARDWARE_MODE == "rk3588":
     rknn = RKNN()
     rknn.load_rknn(MODEL_PATH)
     rknn.init_runtime(target="rk3588")
+
+    BLUE_BUCKET_MODEL_PATH = os.path.join(BASE_DIR, 'models', 'yolov8-blue_bucket-fp16-rk3588.rknn')
+    rknn_blue_bucket = RKNN()
+    rknn_blue_bucket.load_rknn(BLUE_BUCKET_MODEL_PATH)
+    rknn_blue_bucket.init_runtime(target="rk3588")
 elif HARDWARE_MODE == "rk3576":
     MODEL_PATH = os.path.join(BASE_DIR, 'models', 'yolov8-int8-tennis.rknn')
     rknn = RKNN()
@@ -333,6 +338,64 @@ def yolo_infer(frame):
             filtered_boxes.append(box)
 
     return filtered_boxes
+
+def yolo_infer_blue_bucket(frame):
+    if frame is None or frame.size == 0:
+        print("无效的图像输入")
+        return []
+
+    H, W = frame.shape[:2]
+
+    input_img, r, (dw, dh) = letterbox(frame, new_shape=(img_size, img_size), color=(0, 0, 0))
+    input_img = cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB)
+
+    if HARDWARE_MODE == "rk3588":
+        outputs = rknn_blue_bucket.inference(inputs=[input_img], data_format='nhwc')
+
+        pred = outputs[0].squeeze().T
+
+        if pred.ndim != 2 or pred.shape[0] == 0:
+            return []
+
+        scores = pred[:, 4:]
+        class_ids = np.argmax(scores, axis=1)
+        conf_scores = scores[np.arange(len(scores)), class_ids]
+        mask = conf_scores > OBJ_THRESH
+
+        pred = pred[mask]
+        conf_scores = conf_scores[mask]
+
+        raw_boxes = []
+        for p in pred:
+            cx, cy, w, h = p[:4]
+            x1 = cx - 0.5 * w
+            y1 = cy - 0.5 * h
+            x2 = cx + 0.5 * w
+            y2 = cy + 0.5 * h
+            x1 = (x1 - dw) / r
+            y1 = (y1 - dh) / r
+            x2 = (x2 - dw) / r
+            y2 = (y2 - dh) / r
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(W, x2)
+            y2 = min(H, y2)
+            raw_boxes.append([x1, y1, x2, y2])
+
+        raw_boxes = np.array(raw_boxes, dtype=np.float32)
+        indices = cv2.dnn.NMSBoxes(raw_boxes.tolist(), conf_scores.tolist(), OBJ_THRESH, NMS_THRESH)
+
+        result_boxes = []
+        if indices is not None and len(indices) > 0:
+            for idx in indices:
+                i = int(idx) if np.isscalar(idx) else int(idx[0])
+                x1, y1, x2, y2 = raw_boxes[i]
+                box = Box(int(x1), int(y1), int(x2 - x1), int(y2 - y1))
+                result_boxes.append(box)
+
+        return result_boxes
+    else:
+        return get_bucket_local(frame, color="blue")
 
 def get_bucket_local(frame, color="red"):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
