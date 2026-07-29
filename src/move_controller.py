@@ -203,7 +203,7 @@ def reset_search_state():
     global _cycle_time, _last_ball_center_x, _stable_count, _move_frame_count
     global _search_rotate_deg, _search_circles
     global _last_ball_seen_time, _last_pass_max_blob, _current_pass_max_blob, _blob_charge_start_time, _blob_charging
-    global _last_chosen_ball_box
+    global _last_chosen_ball_box, _last_bucket_center_x, _last_chosen_bucket_box
     _last_ball_seen_time = 0.0
     _blob_charging = False
     _search_rotate_deg = 0.0
@@ -212,6 +212,8 @@ def reset_search_state():
     _current_pass_max_blob = 0
     _last_chosen_ball_box = None
     _last_ball_center_x = None
+    _last_bucket_center_x = None
+    _last_chosen_bucket_box = None
     _stable_count = 0
     _move_frame_count = 0
 
@@ -253,6 +255,18 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
                 diameter_px = min(w, h)
                 _last_ball_center_x = center_x
                 distance_cm = _estimate_distance(diameter_px)
+
+        # 球太近（过大）：优先后退，忽略旋转对齐
+        if distance_cm < BEST_DISTANCE_CM - 5.0:
+            frame_time = 1.0 / get_fps()
+            error_cm = distance_cm - BEST_DISTANCE_CM  # 负值
+            factor = 0.9
+            speed_mps = (error_cm / 100.0) / frame_time * factor
+            action = direction.get_action(None)
+            action["x.vel"] = speed_mps
+            _stable_count = 0
+            logger.info(f"too close: dist={distance_cm:.1f}cm err={error_cm:.1f}cm vel={speed_mps:.3f}m/s")
+            return action
 
         # 第一步：先旋转对准球心（中心 +-10px）
         offset = center_x - FIND_GOAL_CX
@@ -309,7 +323,7 @@ def move_controller(direction: DirectionControl, result: list[Box], frame=None) 
             _move_frame_count += 1
             # 速度 = (距离误差cm / 100) / 帧时间 * 0.8 → m/s
             frame_time = 1.0 / get_fps()
-            if error_cm > 10:
+            if abs(error_cm) > 10:
                 factor = 0.9
             else:
                 factor = 0.05
@@ -394,13 +408,13 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box], c
         if abs(offset) > CENTER_FIND_TOLERANCE_PX:
             if offset < 0:
                 action = direction.get_action(None)
-                action['theta.vel'] = 15
+                action['theta.vel'] = 40
             else:
                 action = direction.get_action(None)
-                action['theta.vel'] = -15
+                action['theta.vel'] = -40
             return action
 
-        if w > 240 and abs(offset) <= CENTER_FIND_TOLERANCE_PX:
+        if w > 450 and abs(offset) <= CENTER_FIND_TOLERANCE_PX:
             action = direction.get_action(None)
             if change_status:
                 set_robot_status(RobotStatus.PUT_BALL)
@@ -414,10 +428,10 @@ def move_controller_for_bucket(direction: DirectionControl, result: list[Box], c
             frame_center = (left + right) // 2
             if _last_bucket_center_x < frame_center:
                 action = direction.get_action(None)
-                action['theta.vel'] = 30
+                action['theta.vel'] = 50
             else:
                 action = direction.get_action(None)
-                action['theta.vel'] = -30
+                action['theta.vel'] = -50
         else:
             action = direction.get_action("rotate_left")
     return action
